@@ -3,7 +3,7 @@
 import requests
 import logging as log
 from bs4 import BeautifulSoup
-
+import json
 
 BASE_URL = 'https://www.gradescope.com'
 LOGIN_URL = f'{BASE_URL}/login'
@@ -143,7 +143,57 @@ class Gradescope:
                                     'full_name': course.find(class_='courseBox--name').get_text(strip=True),
                                 })
         return courses_dict
+    
+    def get_course_assignments(self, course_id):
+        '''
+        Retrieves the assignments for a specific course.
 
+        Args:
+            course_id (str): The course ID for the course.
+        
+        Returns:
+            list | None: A list of assignment IDs. 
+                         Returns None if the assignments table is empty.
+        '''
+        response = self.session.get(BASE_URL+'/courses/'+course_id)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        assignments_data = soup.find('div', {'data-react-class': 'AssignmentsTable'})
+
+        if assignments_data:
+            assignments_data = json.loads(assignments_data.get('data-react-props'))
+
+            url_list = []
+            if 'table_data' in assignments_data:
+                for i in range(len(assignments_data['table_data'])):
+                    url = assignments_data['table_data'][i]['url']
+                    assignment_id = url.split('/')[-1]
+                    url_list.append(assignment_id)
+                return url_list
+            else:
+                print('Assignments Table is empty for course ID:', course_id)
+                return None
+        
+        print('Assignments Table not found for course ID:', course_id)
+        return None
+    
+    def get_students_from_assignment(self, course_id, assignment_id):
+        '''
+        Retrieves the students who have submitted the assignment.
+
+        Args:
+            course_id (str): The course ID for the course.
+            assignment_id (str): The assignment ID for the assignment.
+
+        Returns:
+            list: A list of student IDs. (This ID is not the same as the student's university ID. It is a unique ID for Gradescope)
+        '''
+        response = self.session.get(BASE_URL+'/courses/'+course_id+'/assignments/'+assignment_id+'/review_grades')
+        soup = BeautifulSoup(response.text, 'html.parser')
+        students = []
+        for student in soup.find_all(class_='link-gray'):
+            students.append(student.get('href').split('/')[-1])
+        return students
+    
     def _response_check(self, response: requests.Response) -> bool:
         '''
         Checks if the HTTP response is successful.
