@@ -164,11 +164,7 @@ class Gradescope:
 
             url_list = []
             if 'table_data' in assignments_data:
-                for i in range(len(assignments_data['table_data'])):
-                    url = assignments_data['table_data'][i]['url']
-                    assignment_id = url.split('/')[-1]
-                    url_list.append(assignment_id)
-                return url_list
+                return assignments_data['table_data']
             else:
                 print('Assignments Table is empty for course ID:', course_id)
                 return None
@@ -176,7 +172,7 @@ class Gradescope:
         print('Assignments Table not found for course ID:', course_id)
         return None
     
-    def get_students_from_assignment(self, course_id, assignment_id):
+    def get_latest_submissions(self, course_id, assignment_id):
         '''
         Retrieves the students who have submitted the assignment.
 
@@ -189,10 +185,10 @@ class Gradescope:
         '''
         response = self.session.get(BASE_URL+'/courses/'+course_id+'/assignments/'+assignment_id+'/review_grades')
         soup = BeautifulSoup(response.text, 'html.parser')
-        students = []
+        submissions = []
         for student in soup.find_all(class_='link-gray'):
-            students.append(student.get('href').split('/')[-1])
-        return students
+            submissions.append(student.get('href').split('/')[-1])
+        return submissions
     
     def _response_check(self, response: requests.Response) -> bool:
         '''

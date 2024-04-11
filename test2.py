@@ -12,8 +12,10 @@ save_json('./courses.json', courses)
 courseid = courses['Instructor Courses'][0]['course_id']
 BASE_URL = 'https://www.gradescope.com'
 LOGIN_URL = f'{BASE_URL}/login'
-ids = gs.get_course_assignments(courseid)
-print(ids[:10])
-print(len(ids))
-students = gs.get_students_from_assignment(courseid, ids[0])
-print(students)
+assignemnts = gs.get_course_assignments(courseid)
+print(assignemnts)
+save_json('./assignments.json', assignemnts)
+
+# print(len(ids))
+# students = gs.get_students_from_assignment(courseid, ids[0])
+# print(students)
