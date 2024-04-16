@@ -1,9 +1,12 @@
 # gradescope.py
 
+import json
 import requests
 import logging as log
 from bs4 import BeautifulSoup
-import json
+from .dataclass import Course
+from .constants import ROLE_MAP, Role
+
 
 BASE_URL = 'https://www.gradescope.com'
 LOGIN_URL = f'{BASE_URL}/login'
@@ -113,37 +116,41 @@ class Gradescope:
                 raise ValueError('Unknown return URL.')
         return False
 
-    def get_courses(self):
+    def get_courses(self, role: Role) -> list:
         '''
-        Retrieves the courses from the Gradescope.
+        Retrieves a list of courses based on the specified role.
+
+        Args:
+            role (Role): The role for which to retrieve the courses.
 
         Returns:
-            dict: A dictionary containing the courses categorized as 'Instructor Courses' and 'Student Courses'.
-                  Each category contains a list of course details including course ID, URL, term, short name, and full name.
+            list: A list of Course objects representing the courses.
         '''
         response = self.session.get(BASE_URL)
-
         soup = BeautifulSoup(response.text, 'html.parser')
-        courses_dict = {'Instructor Courses': [], 'Student Courses': []}
-        for heading in courses_dict.keys():
-            current_heading = soup.find('h1', string=heading)
-            if current_heading:
-                course_lists = current_heading.find_next_sibling('div', class_='courseList')
-                for term in course_lists.find_all(class_='courseList--term'):
-                    term_name = term.get_text(strip=True)
-                    courses_container = term.find_next_sibling(class_='courseList--coursesForTerm')
-                    if courses_container:
-                        for course in courses_container.find_all(class_='courseBox'):
-                            if course.name == 'a':
-                                courses_dict[heading].append({
-                                    'course_id': course.get('href', '').split('/')[-1],
-                                    'url': f'{BASE_URL}{course.get("href", None)}',
-                                    'term': term_name,
-                                    'short_name': course.find(class_='courseBox--shortname').get_text(strip=True),
-                                    'full_name': course.find(class_='courseBox--name').get_text(strip=True),
-                                })
-        return courses_dict
-    
+
+        courses = list()
+        current_heading = soup.find('h1', string=ROLE_MAP[role.value])
+        if current_heading:
+            course_lists = current_heading.find_next_sibling('div', class_='courseList')
+            for term in course_lists.find_all(class_='courseList--term'):
+                term_name = term.get_text(strip=True)
+                courses_container = term.find_next_sibling(class_='courseList--coursesForTerm')
+                if courses_container:
+                    for course in courses_container.find_all(class_='courseBox'):
+                        if course.name == 'a':
+                            courses.append(
+                                Course(
+                                    course_id=course.get('href', '').split('/')[-1],
+                                    url=f'{BASE_URL}{course.get("href", None)}',
+                                    role=role.value,
+                                    term=term_name,
+                                    short_name=course.find(class_='courseBox--shortname').get_text(strip=True),
+                                    full_name=course.find(class_='courseBox--name').get_text(strip=True)
+                                ))
+
+        return courses
+
     def get_course_assignments(self, course_id):
         '''
         Retrieves the assignments for a specific course.
