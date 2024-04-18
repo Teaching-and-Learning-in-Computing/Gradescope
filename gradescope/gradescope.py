@@ -4,12 +4,8 @@ import json
 import requests
 import logging as log
 from bs4 import BeautifulSoup
-from .dataclass import Course
-from .constants import ROLE_MAP, Role
-
-
-BASE_URL = 'https://www.gradescope.com'
-LOGIN_URL = f'{BASE_URL}/login'
+from .dataclass import Course, Assignment
+from .constants import BASE_URL, LOGIN_URL, ROLE_MAP, Role
 
 
 class Gradescope:
@@ -116,7 +112,7 @@ class Gradescope:
                 raise ValueError('Unknown return URL.')
         return False
 
-    def get_courses(self, role: Role) -> list:
+    def get_courses(self, role: Role) -> list[Course]:
         '''
         Retrieves a list of courses based on the specified role.
 
@@ -142,7 +138,7 @@ class Gradescope:
                             courses.append(
                                 Course(
                                     course_id=course.get('href', '').split('/')[-1],
-                                    url=f'{BASE_URL}{course.get("href", None)}',
+                                    url=course.get('href', None),
                                     role=role.value,
                                     term=term_name,
                                     short_name=course.find(class_='courseBox--shortname').get_text(strip=True),
@@ -151,7 +147,7 @@ class Gradescope:
 
         return courses
 
-    def get_course_assignments(self, course_id):
+    def get_course_assignments(self, course: Course) -> list[Assignment]:
         '''
         Retrieves the assignments for a specific course.
 
@@ -162,21 +158,47 @@ class Gradescope:
             list | None: A list of assignment IDs. 
                          Returns None if the assignments table is empty.
         '''
-        response = self.session.get(BASE_URL+'/courses/'+course_id)
+        response = self.session.get(course.get_url())
         soup = BeautifulSoup(response.text, 'html.parser')
         assignments_data = soup.find('div', {'data-react-class': 'AssignmentsTable'})
 
+        assignments = list()
         if assignments_data:
             assignments_data = json.loads(assignments_data.get('data-react-props'))
-
-            url_list = []
             if 'table_data' in assignments_data:
-                return assignments_data['table_data']
+                for data in assignments_data['table_data']:
+                    assignments.append(
+                        Assignment(
+                            assignment_id=data.get('id'),
+                            assignment_type=data.get('type'),
+                            url=data.get('url'),
+                            title=data.get('title'),
+                            container_id=data.get('container_id'),
+                            versioned=data.get('is_versioned_assignment'),
+                            version_index=data.get('version_index'),
+                            version_name=data.get('version_name'),
+                            total_points=data.get('total_points'),
+                            student_submission=data.get('student_submission'),
+                            created_at=data.get('created_at'),
+                            release_date=data.get('submission_window', {}).get('release_date'),
+                            due_date=data.get('submission_window', {}).get('due_date'),
+                            hard_due_date=data.get('submission_window', {}).get('hard_due_date'),
+                            time_limit=data.get('submission_window', {}).get('time_limit'),
+                            active_submissions=data.get('num_active_submissions'),
+                            grading_progress=data.get('grading_progress'),
+                            published=data.get('is_published'),
+                            regrade_requests_open=data.get('regrade_requests_open'),
+                            regrade_requests_possible=data.get('regrade_requests_possible'),
+                            regrade_request_count=data.get('open_regrade_request_count'),
+                            due_or_created_at_date=data.get('due_or_created_at_date')
+                        )
+                    )
+                return assignments
             else:
-                print('Assignments Table is empty for course ID:', course_id)
+                print('Assignments Table is empty for course ID:', course.course_id)
                 return None
         
-        print('Assignments Table not found for course ID:', course_id)
+        print('Assignments Table not found for course ID:', course.course_id)
         return None
     
     def get_latest_submissions(self, course_id, assignment_id):
