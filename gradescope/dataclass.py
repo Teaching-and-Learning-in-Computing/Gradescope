@@ -51,3 +51,7 @@ class Assignment:
 
     def get_url(self) -> str:
         return urljoin(BASE_URL, self.url)
+
+
+# class Roster:
+    

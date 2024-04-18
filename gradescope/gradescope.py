@@ -144,7 +144,6 @@ class Gradescope:
                                     short_name=course.find(class_='courseBox--shortname').get_text(strip=True),
                                     full_name=course.find(class_='courseBox--name').get_text(strip=True)
                                 ))
-
         return courses
 
     def get_course_assignments(self, course: Course) -> list[Assignment]:
@@ -200,7 +199,12 @@ class Gradescope:
                 raise ValueError(f'Assignments Table is empty for course ID: {course.course_id}')
         raise ValueError(f'Assignments Table not found for course ID: {course.course_id}')
     
-    def get_latest_submissions(self, course_id, assignment_id):
+
+    def get_rosters(self, course: Course):
+        pass
+
+
+    def get_latest_submission_urls(self, assignment: Assignment) -> list[str]:
         '''
         Retrieves the students who have submitted the assignment.
 
@@ -211,11 +215,11 @@ class Gradescope:
         Returns:
             list: A list of student IDs. (This ID is not the same as the student's university ID. It is a unique ID for Gradescope)
         '''
-        response = self.session.get(BASE_URL+'/courses/'+course_id+'/assignments/'+assignment_id+'/review_grades')
+        response = self.session.get(assignment.get_url())
         soup = BeautifulSoup(response.text, 'html.parser')
-        submissions = []
+        submissions = list()
         for student in soup.find_all(class_='link-gray'):
-            submissions.append(student.get('href').split('/')[-1])
+            submissions.append(student.get('href'))
         return submissions
     
     def _response_check(self, response: requests.Response) -> bool:
