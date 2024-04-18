@@ -152,11 +152,13 @@ class Gradescope:
         Retrieves the assignments for a specific course.
 
         Args:
-            course_id (str): The course ID for the course.
-        
+            course (Course): The Course object representing the course for which assignments are to be retrieved.
+
         Returns:
-            list | None: A list of assignment IDs. 
-                         Returns None if the assignments table is empty.
+            list[Assignment]: A list of Assignment objects representing the assignments for the course.
+
+        Raises:
+            ValueError: If the assignments table is empty or not found for the given course.
         '''
         response = self.session.get(course.get_url())
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -195,11 +197,8 @@ class Gradescope:
                     )
                 return assignments
             else:
-                print('Assignments Table is empty for course ID:', course.course_id)
-                return None
-        
-        print('Assignments Table not found for course ID:', course.course_id)
-        return None
+                raise ValueError(f'Assignments Table is empty for course ID: {course.course_id}')
+        raise ValueError(f'Assignments Table not found for course ID: {course.course_id}')
     
     def get_latest_submissions(self, course_id, assignment_id):
         '''
