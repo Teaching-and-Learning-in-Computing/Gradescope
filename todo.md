@@ -1,0 +1,1 @@
+ - [ ] Add login status checking in each function

@@ -9,23 +9,6 @@ from .constants import BASE_URL, LOGIN_URL, ROLE_MAP, Role
 
 
 class Gradescope:
-    '''
-    A Python wrapper for Gradescope.
-
-    Args:
-        username (str | None): The username for Gradescope. Defaults to None.
-        password (str | None): The password for Gradescope. Defaults to None.
-        auto_login (bool): Whether to automatically login upon object initialization. Defaults to True.
-        verbose (bool): Whether to enable verbose logging. Defaults to False.
-
-    Attributes:
-        session (requests.Session): The session object for making HTTP requests.
-        username (str | None): The username for Gradescope.
-        password (str | None): The password for Gradescope.
-        verbose (bool): Whether verbose logging is enabled.
-        logged_in (bool): Whether the user is logged in to Gradescope.
-    '''
-
     def __init__(
             self,
             username: str | None = None,
@@ -33,15 +16,6 @@ class Gradescope:
             auto_login: bool = True,
             verbose: bool = False
         ) -> None:
-        '''
-        Initializes a new instance of the Gradescope class.
-
-        Args:
-            username (str | None): The username for Gradescope. Defaults to None.
-            password (str | None): The password for Gradescope. Defaults to None.
-            auto_login (bool): Whether to automatically login upon object initialization. Defaults to True.
-            verbose (bool): Whether to enable verbose logging. Defaults to False.
-        '''
         self.session = requests.session()
         self.username = username
         self.password = password
@@ -57,20 +31,6 @@ class Gradescope:
             self.login()
 
     def login(self, username: str | None = None, password: str | None = None) -> bool:
-        '''
-        Logs in to the Gradescope website.
-
-        Args:
-            username (str | None): The username for Gradescope. Defaults to None.
-            password (str | None): The password for Gradescope. Defaults to None.
-
-        Returns:
-            bool: True if login is successful, False otherwise.
-
-        Raises:
-            TypeError: If the username or password is None.
-            ValueError: If the login return URL is unknown.
-        '''
         if username is not None: self.username = username
         if password is not None: self.password = password
         if self.username is None or self.password is None:
@@ -113,15 +73,6 @@ class Gradescope:
         return False
 
     def get_courses(self, role: Role) -> list[Course]:
-        '''
-        Retrieves a list of courses based on the specified role.
-
-        Args:
-            role (Role): The role for which to retrieve the courses.
-
-        Returns:
-            list: A list of Course objects representing the courses.
-        '''
         response = self.session.get(BASE_URL)
         soup = BeautifulSoup(response.text, 'html.parser')
 
@@ -146,19 +97,7 @@ class Gradescope:
                                 ))
         return courses
 
-    def get_course_assignments(self, course: Course) -> list[Assignment]:
-        '''
-        Retrieves the assignments for a specific course.
-
-        Args:
-            course (Course): The Course object representing the course for which assignments are to be retrieved.
-
-        Returns:
-            list[Assignment]: A list of Assignment objects representing the assignments for the course.
-
-        Raises:
-            ValueError: If the assignments table is empty or not found for the given course.
-        '''
+    def get_assignments(self, course: Course) -> list[Assignment]:
         response = self.session.get(course.get_url())
         soup = BeautifulSoup(response.text, 'html.parser')
         assignments_data = soup.find('div', {'data-react-class': 'AssignmentsTable'})
@@ -205,16 +144,6 @@ class Gradescope:
 
 
     def get_latest_submission_urls(self, assignment: Assignment) -> list[str]:
-        '''
-        Retrieves the students who have submitted the assignment.
-
-        Args:
-            course_id (str): The course ID for the course.
-            assignment_id (str): The assignment ID for the assignment.
-
-        Returns:
-            list: A list of student IDs. (This ID is not the same as the student's university ID. It is a unique ID for Gradescope)
-        '''
         response = self.session.get(assignment.get_url())
         soup = BeautifulSoup(response.text, 'html.parser')
         submissions = list()
@@ -223,18 +152,6 @@ class Gradescope:
         return submissions
     
     def _response_check(self, response: requests.Response) -> bool:
-        '''
-        Checks if the HTTP response is successful.
-
-        Args:
-            response (requests.Response): The HTTP response object.
-
-        Returns:
-            bool: True if the response is successful, False otherwise.
-
-        Raises:
-            ValueError: If the response status code is not 200.
-        '''
         if response.status_code == 200:
             return True
         else:
