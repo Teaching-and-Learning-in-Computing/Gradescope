@@ -1,21 +1,24 @@
 # gradescope.py
 
+import re
 import json
 import requests
 import logging as log
 from bs4 import BeautifulSoup
-from .dataclass import Course, Assignment
-from .constants import BASE_URL, LOGIN_URL, ROLE_MAP, Role
+from datetime import datetime
+from urllib.parse import urljoin, urlparse, parse_qs
+from .dataclass import Course, Assignment, Member, Submission
+from .constants import BASE_URL, LOGIN_URL, GRADEBOOK, PAST_SUBMISSIONS, ROLE_MAP, Role
 
 
 class Gradescope:
     def __init__(
-            self,
-            username: str | None = None,
-            password: str | None = None,
-            auto_login: bool = True,
-            verbose: bool = False
-        ) -> None:
+        self,
+        username: str | None = None,
+        password: str | None = None,
+        auto_login: bool = True,
+        verbose: bool = False
+    ) -> None:
         self.session = requests.session()
         self.username = username
         self.password = password
@@ -88,13 +91,14 @@ class Gradescope:
                         if course.name == 'a':
                             courses.append(
                                 Course(
-                                    course_id=course.get('href', '').split('/')[-1],
+                                    course_id=self._parse_int(course.get('href', '').split('/')[-1]),
                                     url=course.get('href', None),
                                     role=role.value,
                                     term=term_name,
                                     short_name=course.find(class_='courseBox--shortname').get_text(strip=True),
                                     full_name=course.find(class_='courseBox--name').get_text(strip=True)
-                                ))
+                                )
+                            )
         return courses
 
     def get_assignments(self, course: Course) -> list[Assignment]:
@@ -109,7 +113,7 @@ class Gradescope:
                 for data in assignments_data['table_data']:
                     assignments.append(
                         Assignment(
-                            assignment_id=data.get('id'),
+                            assignment_id=self._parse_int(data.get('id')),
                             assignment_type=data.get('type'),
                             url=data.get('url'),
                             title=data.get('title'),
@@ -137,22 +141,83 @@ class Gradescope:
             else:
                 raise ValueError(f'Assignments Table is empty for course ID: {course.course_id}')
         raise ValueError(f'Assignments Table not found for course ID: {course.course_id}')
-    
 
-    def get_rosters(self, course: Course):
-        pass
-
-
-    def get_latest_submission_urls(self, assignment: Assignment) -> list[str]:
-        response = self.session.get(assignment.get_url())
+    def get_members(self, course: Course) -> list[Member]:
+        response = self.session.get(urljoin(BASE_URL, course.get_url()+'/memberships'))
         soup = BeautifulSoup(response.text, 'html.parser')
-        submissions = list()
-        for student in soup.find_all(class_='link-gray'):
-            submissions.append(student.get('href'))
-        return submissions
+
+        members = list()
+        for entry in soup.findAll('table')[0].findAll('tr'):
+            id_button = entry.find('button', class_='js-rosterName')
+            if id_button:
+                parsed_params = parse_qs(urlparse(id_button['data-url']).query)
+                user_id = parsed_params.get('user_id')[0]
+
+                other_info_button = entry.find('button', class_='rosterCell--editIcon')
+                data_cm = json.loads(other_info_button['data-cm'])
+
+                role = other_info_button.get('data-role')
+                email = other_info_button.get('data-email')
+
+                member = Member(
+                    member_id=user_id,
+                    full_name=data_cm.get('full_name'),
+                    first_name=data_cm.get('first_name'),
+                    last_name=data_cm.get('last_name'),
+                    role=role,
+                    sid=data_cm.get('sid'),
+                    email=email
+                )
+                members.append(member)
+        return members
+
+    def get_gradebook(self, course: Course, member: Member) -> dict:
+        url = GRADEBOOK.format(
+            course_id=course.course_id,
+            member_id=member.member_id
+        )
+        response = self.session.get(url)
+        return json.loads(response.text)
     
+    # Returns None when the member does not exist in the course or assignment
+    def get_past_submissions(self, course: Course, assignment: Assignment, member: Member) -> list[Submission]:
+        gradebook = self.get_gradebook(course, member)
+        url = None
+        for item in gradebook:
+            item_data = item.get('assignment')
+            if item_data.get('id') == assignment.assignment_id:
+                url = item_data.get('submission').get('url')
+                break
+
+        if url == None:
+            return None
+
+        response = self.session.get(urljoin(BASE_URL, url + PAST_SUBMISSIONS))
+        json_data = json.loads(response.text)['past_submissions']
+
+        submissions = list()
+        for data in json_data:
+            submissions.append(
+                Submission(
+                    course_id=course.course_id,
+                    assignment_id=assignment.assignment_id,
+                    member_id=member.member_id,
+                    submission_id=data.get('id'),
+                    created_at=data.get('created_at'),
+                    score=float(data.get('score')),
+                    url=data.get('show_path')
+                )
+            )
+        return submissions
+
     def _response_check(self, response: requests.Response) -> bool:
         if response.status_code == 200:
             return True
         else:
             raise ValueError(f'Failed to fetch the webpage. Status code: {response.status_code}')
+
+    def _parse_int(self, text: str) -> int:
+        return int(''.join(re.findall(r'\d', text)))
+
+    def _to_datetime(self, text: str) -> datetime:
+        return datetime.strptime(text, "%Y-%m-%dT%H:%M")

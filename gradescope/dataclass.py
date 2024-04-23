@@ -7,7 +7,7 @@ from .constants import BASE_URL, Role
 
 @dataclass
 class Course:
-    course_id: str
+    course_id: int
     url: str
     role: Role
     term: str
@@ -20,7 +20,7 @@ class Course:
 
 @dataclass
 class Assignment:
-    assignment_id: str
+    assignment_id: int
     assignment_type: str
     url: str
     title: str
@@ -53,5 +53,26 @@ class Assignment:
         return urljoin(BASE_URL, self.url)
 
 
-# class Roster:
-    
+@dataclass
+class Member:
+    member_id: int
+    full_name: str
+    first_name: str
+    last_name: str
+    role: int
+    sid: str
+    email: str
+
+
+@dataclass
+class Submission:
+    course_id: int
+    assignment_id: int
+    member_id: int
+    submission_id: int
+    created_at: str
+    score: int
+    url: str
+
+    def get_url(self) -> str:
+        return urljoin(BASE_URL, self.url)
