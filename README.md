@@ -8,7 +8,7 @@ After including the gradescope folder in your project, import the necessary file
 In order to be able to access your account, the `Gradescope` object requires a username and password as arguments.
 
 ```py
-from gradescope import Gradescope
+from gradescope import Gradescope, Role
 
 gs = Gradescope('my_username', 'my_password')
 
