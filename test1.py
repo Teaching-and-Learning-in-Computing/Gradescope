@@ -1,5 +1,5 @@
 import json
-from gradescope import Gradescope, save_json, Role, EnhancedJSONEncoder, Course, Assignment, Member
+from gradescope import *
 
 with open('./login.key', 'r') as f:
     login_info = json.load(f)
@@ -19,3 +19,6 @@ save_json('./gradebook.data', gradebook, encoder=EnhancedJSONEncoder)
 
 past_submission = gs.get_past_submissions(courses[0], assignments[-1], member)
 save_json('./past_submission.data', past_submission, encoder=EnhancedJSONEncoder)
+
+grades_csv = gs.get_assignment_grades(assignments[0])
+save_csv('./assignment_grades_csv.data', grades_csv)

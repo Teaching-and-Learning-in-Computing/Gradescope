@@ -23,5 +23,11 @@ gradebook = gs.get_gradebook(courses[0], members[0])
 past_submissions = gs.get_past_submissions(courses[0], assignments[0], members[0])
 ```
 
-## Contribution
-Written by HyunJun Park and Daniel Song (UCI Spring 2024)
+## [Contribution](https://github.com/Teaching-and-Learning-in-Computing/Gradescope/graphs/contributors)
+Written by [HyunJun Park](https://github.com/Nitro1231) and [Daniel Song](https://github.com/dan2972) (UCI Spring 2024)
+
+
+## Datatypes
+```python
+
+```

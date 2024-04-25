@@ -1,13 +1,16 @@
 # gradescope.py
 
+import io
 import re
 import json
 import requests
+import pandas as pd
 import logging as log
 from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import urljoin, urlparse, parse_qs
 from .dataclass import Course, Assignment, Member, Submission
+from .errors import LoginError, NotLoggedInError, ResponseError
 from .constants import BASE_URL, LOGIN_URL, GRADEBOOK, PAST_SUBMISSIONS, ROLE_MAP, Role
 
 
@@ -40,15 +43,15 @@ class Gradescope:
             raise TypeError('The username or password cannot be None.')
 
         response = self.session.get(BASE_URL)
-        if self._response_check(response):
-            soup = BeautifulSoup(response.text, 'html.parser')
-            token_input = soup.find('input', attrs={'name': 'authenticity_token'})
+        self._response_check(response)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        token_input = soup.find('input', attrs={'name': 'authenticity_token'})
 
-            if token_input:
-                authenticity_token = token_input.get('value')
-                log.info(f'[Login] Authenticity Token: {authenticity_token}')
-            else:
-                log.warning('[Login] Authenticity token not found.')
+        if token_input:
+            authenticity_token = token_input.get('value')
+            log.info(f'[Login] Authenticity Token: {authenticity_token}')
+        else:
+            log.warning('[Login] Authenticity token not found.')
 
         data = {
             'authenticity_token': authenticity_token,
@@ -59,24 +62,26 @@ class Gradescope:
             'session[remember_me_sso]': 0,
         }
         response = self.session.post(LOGIN_URL, data=data)
+        self._response_check(response)
 
-        if self._response_check(response):
-            log.info(f'[Login] Current URL: {response.url}')
-            if 'account' in response.url:
-                log.info('[Login] Login Successful.')
-                self.logged_in = True
-                return True
-            elif 'login' in response.url:
-                log.warning('[Login] Login Failed.')
-                self.logged_in = False
-                return False
-            else:
-                self.logged_in = False
-                raise ValueError('Unknown return URL.')
-        return False
+        log.info(f'[Login] Current URL: {response.url}')
+        if 'account' in response.url:
+            log.info('[Login] Login Successful.')
+            self.logged_in = True
+            return True
+        elif 'login' in response.url:
+            log.warning('[Login] Login Failed.')
+            self.logged_in = False
+            return False
+        else:
+            self.logged_in = False
+            raise LoginError('Unknown return URL.')
 
     def get_courses(self, role: Role) -> list[Course]:
+        if not self.logged_in: raise NotLoggedInError
+
         response = self.session.get(BASE_URL)
+        self._response_check(response)
         soup = BeautifulSoup(response.text, 'html.parser')
 
         courses = list()
@@ -99,10 +104,16 @@ class Gradescope:
                                     full_name=course.find(class_='courseBox--name').get_text(strip=True)
                                 )
                             )
+        else:
+            log.warning(f'Cannot find heading for Role: {role}')
+            # raise ResponseError(f'Cannot find heading for Role: {role}')
         return courses
 
     def get_assignments(self, course: Course) -> list[Assignment]:
+        if not self.logged_in: raise NotLoggedInError
+
         response = self.session.get(course.get_url())
+        self._response_check(response)
         soup = BeautifulSoup(response.text, 'html.parser')
         assignments_data = soup.find('div', {'data-react-class': 'AssignmentsTable'})
 
@@ -139,11 +150,14 @@ class Gradescope:
                     )
                 return assignments
             else:
-                raise ValueError(f'Assignments Table is empty for course ID: {course.course_id}')
-        raise ValueError(f'Assignments Table not found for course ID: {course.course_id}')
+                raise ResponseError(f'Assignments Table is empty for course ID: {course.course_id}')
+        raise ResponseError(f'Assignments Table not found for course ID: {course.course_id}')
 
     def get_members(self, course: Course) -> list[Member]:
-        response = self.session.get(urljoin(BASE_URL, course.get_url()+'/memberships'))
+        if not self.logged_in: raise NotLoggedInError
+
+        response = self.session.get(urljoin(BASE_URL, course.get_url() + '/memberships'))
+        self._response_check(response)
         soup = BeautifulSoup(response.text, 'html.parser')
 
         members = list()
@@ -171,16 +185,10 @@ class Gradescope:
                 members.append(member)
         return members
 
-    def get_gradebook(self, course: Course, member: Member) -> dict:
-        url = GRADEBOOK.format(
-            course_id=course.course_id,
-            member_id=member.member_id
-        )
-        response = self.session.get(url)
-        return json.loads(response.text)
-    
     # Returns None when the member does not exist in the course or assignment
     def get_past_submissions(self, course: Course, assignment: Assignment, member: Member) -> list[Submission]:
+        if not self.logged_in: raise NotLoggedInError
+
         gradebook = self.get_gradebook(course, member)
         url = None
         for item in gradebook:
@@ -193,6 +201,7 @@ class Gradescope:
             return None
 
         response = self.session.get(urljoin(BASE_URL, url + PAST_SUBMISSIONS))
+        self._response_check(response)
         json_data = json.loads(response.text)['past_submissions']
 
         submissions = list()
@@ -210,11 +219,29 @@ class Gradescope:
             )
         return submissions
 
+    def get_gradebook(self, course: Course, member: Member) -> dict:
+        if not self.logged_in: raise NotLoggedInError
+
+        url = GRADEBOOK.format(
+            course_id=course.course_id,
+            member_id=member.member_id
+        )
+        response = self.session.get(url)
+        self._response_check(response)
+        return json.loads(response.text)
+
+    def get_assignment_grades(self, assignment: Assignment) -> pd.DataFrame:
+        if not self.logged_in: raise NotLoggedInError
+
+        response = self.session.get(assignment.get_grades_url())
+        self._response_check(response)
+        return pd.read_csv(io.StringIO(response.content.decode('utf-8')), skiprows=2)
+
     def _response_check(self, response: requests.Response) -> bool:
         if response.status_code == 200:
             return True
         else:
-            raise ValueError(f'Failed to fetch the webpage. Status code: {response.status_code}')
+            raise ResponseError(f'Failed to fetch the webpage. Status code: {response.status_code}')
 
     def _parse_int(self, text: str) -> int:
         return int(''.join(re.findall(r'\d', text)))
