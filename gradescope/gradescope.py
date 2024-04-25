@@ -112,7 +112,7 @@ class Gradescope:
     def get_assignments(self, course: Course) -> list[Assignment]:
         if not self.logged_in: raise NotLoggedInError
 
-        response = self.session.get(course.get_url())
+        response = self.session.get(urljoin(BASE_URL, course.get_url() + '/assignments'))
         self._response_check(response)
         soup = BeautifulSoup(response.text, 'html.parser')
         assignments_data = soup.find('div', {'data-react-class': 'AssignmentsTable'})
@@ -213,7 +213,7 @@ class Gradescope:
                     member_id=member.member_id,
                     submission_id=data.get('id'),
                     created_at=data.get('created_at'),
-                    score=float(data.get('score')),
+                    score=float(data.get('score')) if data.get('score') else None,
                     url=data.get('show_path')
                 )
             )
@@ -233,7 +233,7 @@ class Gradescope:
     def get_assignment_grades(self, assignment: Assignment) -> pd.DataFrame:
         if not self.logged_in: raise NotLoggedInError
 
-        response = self.session.get(assignment.get_grades_url())
+        response = self.session.get(urljoin(BASE_URL, assignment.get_grades_url()))
         self._response_check(response)
         return pd.read_csv(io.StringIO(response.content.decode('utf-8')), skiprows=2)
 
@@ -248,7 +248,7 @@ class Gradescope:
         if response.status_code == 200:
             return True
         else:
-            raise ResponseError(f'Failed to fetch the webpage. Status code: {response.status_code}')
+            raise ResponseError(f'Failed to fetch the webpage. Status code: {response.status_code}. URL: {response.url}')
 
     def _parse_int(self, text: str) -> int:
         return int(''.join(re.findall(r'\d', text)))

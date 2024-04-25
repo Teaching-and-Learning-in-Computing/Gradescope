@@ -1,6 +1,12 @@
 # Gradescope
 A Python wrapper for Gradescope to easily retrieve data from your Gradescope Courses.
 
+## Install
+```bash
+pip install gradescope-tool
+```
+
+
 ## Example Usage
 
 After including the gradescope folder in your project, import the necessary files.
