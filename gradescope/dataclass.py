@@ -79,3 +79,6 @@ class Submission:
 
     def get_url(self) -> str:
         return urljoin(BASE_URL, self.url)
+
+    def get_file_url(self) -> str:
+        return urljoin(BASE_URL, self.url + '.zip')

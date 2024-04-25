@@ -22,3 +22,6 @@ save_json('./past_submission.data', past_submission, encoder=EnhancedJSONEncoder
 
 grades_csv = gs.get_assignment_grades(assignments[0])
 save_csv('./assignment_grades_csv.data', grades_csv)
+
+print('Downloading...', past_submission[-1])
+gs.download_file('./submission.zip', past_submission[-1].get_file_url())

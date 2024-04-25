@@ -237,6 +237,13 @@ class Gradescope:
         self._response_check(response)
         return pd.read_csv(io.StringIO(response.content.decode('utf-8')), skiprows=2)
 
+    def download_file(self, path: str, url: str) -> None:
+        if not self.logged_in: raise NotLoggedInError
+
+        response = self.session.get(url)
+        with open(path, 'wb') as file:
+            file.write(response.content)
+
     def _response_check(self, response: requests.Response) -> bool:
         if response.status_code == 200:
             return True
