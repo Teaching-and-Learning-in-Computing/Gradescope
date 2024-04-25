@@ -15,6 +15,9 @@ from .constants import BASE_URL, LOGIN_URL, GRADEBOOK, PAST_SUBMISSIONS, ROLE_MA
 
 
 class Gradescope:
+    '''
+    A Python wrapper for Gradescope to easily retrieve data from your Gradescope Courses.
+    '''
     def __init__(
         self,
         username: str | None = None,
@@ -22,6 +25,15 @@ class Gradescope:
         auto_login: bool = True,
         verbose: bool = False
     ) -> None:
+        '''
+        Initializes a Gradescope object.
+
+        Args:
+            username (str | None): The username for logging into Gradescope. Defaults to None.
+            password (str | None): The password for logging into Gradescope. Defaults to None.
+            auto_login (bool): Whether to automatically login upon object initialization. Defaults to True.
+            verbose (bool): Whether to enable verbose logging. Defaults to False.
+        '''
         self.session = requests.session()
         self.username = username
         self.password = password
@@ -37,6 +49,20 @@ class Gradescope:
             self.login()
 
     def login(self, username: str | None = None, password: str | None = None) -> bool:
+        '''
+        Log into Gradescope with the provided username and password.
+
+        Args:
+            username (str | None): The username for logging into Gradescope. Defaults to None.
+            password (str | None): The password for logging into Gradescope. Defaults to None.
+
+        Returns:
+            bool: True if login is successful, False otherwise.
+        
+        Raises:
+            TypeError: If the username or password is None.
+            LoginError: If the return URL after login is unknown.
+        '''
         if username is not None: self.username = username
         if password is not None: self.password = password
         if self.username is None or self.password is None:
@@ -78,6 +104,19 @@ class Gradescope:
             raise LoginError('Unknown return URL.')
 
     def get_courses(self, role: Role) -> list[Course]:
+        '''
+        Retrieves the list of courses for the specified role.
+
+        Args:
+            role (Role): The role for which to retrieve the courses.
+
+        Returns:
+            list[Course]: The list of courses for the specified role.
+
+        Raises:
+            NotLoggedInError: If not logged in.
+            ResponseError: If the heading for the specified role is not found.
+        '''
         if not self.logged_in: raise NotLoggedInError
 
         response = self.session.get(BASE_URL)
@@ -110,9 +149,22 @@ class Gradescope:
         return courses
 
     def get_assignments(self, course: Course) -> list[Assignment]:
+        '''
+        Retrieves the list of assignments for the specified course.
+
+        Args:
+            course (Course): The course for which to retrieve the assignments.
+
+        Returns:
+            list[Assignment]: The list of assignments for the specified course.
+
+        Raises:
+            NotLoggedInError: If not logged in.
+            ResponseError: If the assignments table is empty or not found for the specified course.
+        '''
         if not self.logged_in: raise NotLoggedInError
 
-        response = self.session.get(urljoin(BASE_URL, course.get_url() + '/assignments'))
+        response = self.session.get(course.get_url() + '/assignments')
         self._response_check(response)
         soup = BeautifulSoup(response.text, 'html.parser')
         assignments_data = soup.find('div', {'data-react-class': 'AssignmentsTable'})
@@ -154,9 +206,21 @@ class Gradescope:
         raise ResponseError(f'Assignments Table not found for course ID: {course.course_id}')
 
     def get_members(self, course: Course) -> list[Member]:
+        '''
+        Retrieves the list of members for the specified course.
+
+        Args:
+            course (Course): The course for which to retrieve the members.
+
+        Returns:
+            list[Member]: The list of members for the specified course.
+
+        Raises:
+            NotLoggedInError: If not logged in.
+        '''
         if not self.logged_in: raise NotLoggedInError
 
-        response = self.session.get(urljoin(BASE_URL, course.get_url() + '/memberships'))
+        response = self.session.get(course.get_url() + '/memberships')
         self._response_check(response)
         soup = BeautifulSoup(response.text, 'html.parser')
 
@@ -187,6 +251,20 @@ class Gradescope:
 
     # Returns None when the member does not exist in the course or assignment
     def get_past_submissions(self, course: Course, assignment: Assignment, member: Member) -> list[Submission]:
+        '''
+        Retrieves the list of past submissions for the specified course, assignment, and member.
+
+        Args:
+            course (Course): The course for which to retrieve the past submissions.
+            assignment (Assignment): The assignment for which to retrieve the past submissions.
+            member (Member): The member for which to retrieve the past submissions.
+
+        Returns:
+            list[Submission]: The list of past submissions for the specified course, assignment, and member.
+
+        Raises:
+            NotLoggedInError: If not logged in.
+        '''
         if not self.logged_in: raise NotLoggedInError
 
         gradebook = self.get_gradebook(course, member)
@@ -220,6 +298,19 @@ class Gradescope:
         return submissions
 
     def get_gradebook(self, course: Course, member: Member) -> dict:
+        '''
+        Retrieves the gradebook for a specific course and member.
+
+        Args:
+            course (Course): The course object.
+            member (Member): The member object.
+
+        Returns:
+            dict: The gradebook data as a dictionary.
+
+        Raises:
+            NotLoggedInError: If the user is not logged in.
+        '''
         if not self.logged_in: raise NotLoggedInError
 
         url = GRADEBOOK.format(
@@ -231,13 +322,35 @@ class Gradescope:
         return json.loads(response.text)
 
     def get_assignment_grades(self, assignment: Assignment) -> pd.DataFrame:
+        '''
+        Retrieves the grades for a specific assignment.
+
+        Args:
+            assignment (Assignment): The assignment object.
+
+        Returns:
+            pd.DataFrame: The assignment grades as a pandas DataFrame.
+
+        Raises:
+            NotLoggedInError: If the user is not logged in.
+        '''
         if not self.logged_in: raise NotLoggedInError
 
-        response = self.session.get(urljoin(BASE_URL, assignment.get_grades_url()))
+        response = self.session.get(assignment.get_grades_url())
         self._response_check(response)
         return pd.read_csv(io.StringIO(response.content.decode('utf-8')), skiprows=2)
 
     def download_file(self, path: str, url: str) -> None:
+        '''
+        Downloads a file from a given URL and saves it to the specified path.
+
+        Args:
+            path (str): The path where the file should be saved.
+            url (str): The URL of the file to be downloaded.
+
+        Raises:
+            NotLoggedInError: If the user is not logged in.
+        '''
         if not self.logged_in: raise NotLoggedInError
 
         response = self.session.get(url)
@@ -245,13 +358,43 @@ class Gradescope:
             file.write(response.content)
 
     def _response_check(self, response: requests.Response) -> bool:
+        '''
+        Checks the response status code and raises an error if it's not 200.
+
+        Args:
+            response (requests.Response): The response object.
+
+        Returns:
+            bool: True if the status code is 200.
+
+        Raises:
+            ResponseError: If the status code is not 200.
+        '''
         if response.status_code == 200:
             return True
         else:
             raise ResponseError(f'Failed to fetch the webpage. Status code: {response.status_code}. URL: {response.url}')
 
     def _parse_int(self, text: str) -> int:
+        '''
+        Parses an integer from a given text.
+
+        Args:
+            text (str): The text containing the integer.
+
+        Returns:
+            int: The parsed integer.
+        '''
         return int(''.join(re.findall(r'\d', text)))
 
     def _to_datetime(self, text: str) -> datetime:
+        '''
+        Converts a string to a datetime object.
+
+        Args:
+            text (str): The string to be converted.
+
+        Returns:
+            datetime: The converted datetime object.
+        '''
         return datetime.strptime(text, "%Y-%m-%dT%H:%M")
