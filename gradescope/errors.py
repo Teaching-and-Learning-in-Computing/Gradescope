@@ -16,11 +16,6 @@ class NotLoggedInError(GradescopeError):
         super().__init__(msg)
 
 
-# class NoResultsError(GradescopeError):
-#     def __init__(self, msg: str = 'No result found.'):
-#         super().__init__(msg)
-
-
 class ResponseError(GradescopeError):
     def __init__(self, msg: str):
         super().__init__(msg)
