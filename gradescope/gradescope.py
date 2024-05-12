@@ -354,6 +354,7 @@ class Gradescope:
         if not self.logged_in: raise NotLoggedInError
 
         response = self.session.get(url)
+        self._response_check(response)
         with open(path, 'wb') as file:
             file.write(response.content)
 
