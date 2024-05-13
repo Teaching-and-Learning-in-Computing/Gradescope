@@ -1,7 +1,7 @@
 import setuptools
 
 
-VERSION = '0.1.1'
+VERSION = '0.1.2'
 REQUIREMENTS = [i.strip() for i in open('requirements.txt').readlines()]
 
 with open('README.md', 'r', encoding='utf8') as f:
@@ -25,4 +25,5 @@ setuptools.setup(
         'Operating System :: OS Independent',
     ],
     python_requires='>=3.7',
+    install_requires=REQUIREMENTS
 )
