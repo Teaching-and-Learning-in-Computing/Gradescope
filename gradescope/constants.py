@@ -1,4 +1,4 @@
-from enum import StrEnum
+from enum import Enum
 
 
 BASE_URL = 'https://www.gradescope.com'
@@ -13,6 +13,6 @@ ROLE_MAP = {
 }
 
 
-class Role(StrEnum):
+class Role(Enum):
     STUDENT     = 'student'
     INSTRUCTOR  = 'instructor'

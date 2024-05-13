@@ -1,8 +1,8 @@
 import setuptools
 
 
-VERSION = '0.1.0'
-
+VERSION = '0.1.1'
+REQUIREMENTS = [i.strip() for i in open('requirements.txt').readlines()]
 
 with open('README.md', 'r', encoding='utf8') as f:
     long_description = f.read()
@@ -24,5 +24,5 @@ setuptools.setup(
         'License :: OSI Approved :: MIT License',
         'Operating System :: OS Independent',
     ],
-    python_requires='>=3.6',
+    python_requires='>=3.7',
 )
