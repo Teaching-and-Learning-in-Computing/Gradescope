@@ -8,11 +8,11 @@ PAST_SUBMISSIONS = '.json?content=react&only_keys%5B%5D=past_submissions'
 
 
 ROLE_MAP = {
-    'student': 'Student Courses',
-    'instructor': 'Instructor Courses'
+    'student': ['Your Courses', 'Student Courses'],
+    'instructor': ['Instructor Courses']
 }
 
 
 class Role(Enum):
-    STUDENT     = 'student'
-    INSTRUCTOR  = 'instructor'
+    STUDENT = 'student'
+    INSTRUCTOR = 'instructor'

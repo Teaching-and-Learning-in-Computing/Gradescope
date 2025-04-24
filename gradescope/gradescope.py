@@ -9,7 +9,7 @@ import logging as log
 from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import urljoin, urlparse, parse_qs
-from .dataclass import Course, Assignment, Member, Submission
+from .dataclass import Course, Assignment, StudentAssignment, Member, Submission
 from .errors import LoginError, NotLoggedInError, ResponseError
 from .constants import BASE_URL, LOGIN_URL, GRADEBOOK, PAST_SUBMISSIONS, ROLE_MAP, Role
 
@@ -58,13 +58,15 @@ class Gradescope:
 
         Returns:
             bool: True if login is successful, False otherwise.
-        
+
         Raises:
             TypeError: If the username or password is None.
             LoginError: If the return URL after login is unknown.
         '''
-        if username is not None: self.username = username
-        if password is not None: self.password = password
+        if username is not None:
+            self.username = username
+        if password is not None:
+            self.password = password
         if self.username is None or self.password is None:
             raise TypeError('The username or password cannot be None.')
 
@@ -99,7 +101,7 @@ class Gradescope:
             log.warning('[Login] Login Failed.')
             self.logged_in = False
             return False
-        else:
+        else: 
             self.logged_in = False
             raise LoginError('Unknown return URL.')
 
@@ -117,14 +119,21 @@ class Gradescope:
             NotLoggedInError: If not logged in.
             ResponseError: If the heading for the specified role is not found.
         '''
-        if not self.logged_in: raise NotLoggedInError
+        if not self.logged_in:
+            raise NotLoggedInError
 
         response = self.session.get(BASE_URL)
         self._response_check(response)
         soup = BeautifulSoup(response.text, 'html.parser')
 
         courses = list()
-        current_heading = soup.find('h1', string=ROLE_MAP[role.value])
+
+        rmap = ROLE_MAP[role.value]
+        for _ in rmap:
+            current_heading = soup.find('h1', string=ROLE_MAP[role.value])
+            if current_heading:
+                break
+
         if current_heading:
             course_lists = current_heading.find_next_sibling('div', class_='courseList')
             for term in course_lists.find_all(class_='courseList--term'):
@@ -162,7 +171,8 @@ class Gradescope:
             NotLoggedInError: If not logged in.
             ResponseError: If the assignments table is empty or not found for the specified course.
         '''
-        if not self.logged_in: raise NotLoggedInError
+        if not self.logged_in:
+            raise NotLoggedInError
 
         response = self.session.get(course.get_url() + '/assignments')
         self._response_check(response)
@@ -205,6 +215,74 @@ class Gradescope:
                 raise ResponseError(f'Assignments Table is empty for course ID: {course.course_id}')
         raise ResponseError(f'Assignments Table not found for course ID: {course.course_id}')
 
+    def get_assignments_as_student(self, course: Course) -> list[StudentAssignment]:
+        '''
+        Retrieves the list of assignments visible to a student for the specified course.
+
+        This method parses the student-facing assignment table on Gradescope to extract information such as
+        assignment title, submission status, scores, due dates, and template download links.
+
+        Args:
+            course (Course): The course for which to retrieve the assignments.
+
+        Returns:
+            list[StudentAssignment]: A list of StudentAssignment objects with assignment details.
+
+        Raises:
+            NotLoggedInError: If the user is not logged in.
+            ResponseError: If the assignments table cannot be found for the specified course.
+        '''
+        if not self.logged_in:
+            raise NotLoggedInError
+
+        response = self.session.get(course.get_url())
+        self._response_check(response)
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        assignments_table = soup.find('table', {'id': 'assignments-student-table'})
+        if not assignments_table:
+            raise ResponseError(f'Student assignments table not found for course ID: {course.course_id}')
+
+        assignments = []
+        rows = assignments_table.find('tbody').find_all('tr')
+
+        for row in rows:
+            title_cell = row.find('th', class_='table--primaryLink')
+            if not title_cell:
+                continue
+
+            title_button = title_cell.find('button')
+            title = title_button.get_text(strip=True) if title_button else title_cell.get_text(strip=True)
+            assignment_id = int(title_button['data-assignment-id']) if title_button and 'data-assignment-id' in title_button.attrs else None
+            submission_url = title_button['data-post-url'] if title_button and 'data-post-url' in title_button.attrs else None
+            template_url = title_button.get('data-template-url') if title_button and 'data-template-url' in title_button.attrs else None
+
+            status_cell = row.find('td', class_='submissionStatus')
+            submitted = 'submissionStatus-complete' in status_cell.get('class', []) if status_cell else False
+            score_div = status_cell.find('div', class_='submissionStatus--score') if status_cell else None
+            score = score_div.get_text(strip=True) if score_div else None
+
+            release_time = row.find('time', class_='submissionTimeChart--releaseDate')
+            due_time = row.find('time', class_='submissionTimeChart--dueDate')
+
+            # Some rows have two due time elements (for late due date)
+            all_due_times = row.find_all('time', class_='submissionTimeChart--dueDate')
+            late_due_time = all_due_times[1]['datetime'] if len(all_due_times) > 1 else None
+
+            assignments.append(StudentAssignment(
+                assignment_id=assignment_id,
+                title=title,
+                submission_url=submission_url,
+                template_url=template_url,
+                submitted=submitted,
+                score=score,
+                release_date=release_time['datetime'] if release_time else None,
+                due_date=due_time['datetime'] if due_time else None,
+                late_due_date=late_due_time
+            ))
+
+        return assignments
+
     def get_members(self, course: Course) -> list[Member]:
         '''
         Retrieves the list of members for the specified course.
@@ -218,7 +296,8 @@ class Gradescope:
         Raises:
             NotLoggedInError: If not logged in.
         '''
-        if not self.logged_in: raise NotLoggedInError
+        if not self.logged_in:
+            raise NotLoggedInError
 
         response = self.session.get(course.get_url() + '/memberships')
         self._response_check(response)
@@ -265,7 +344,8 @@ class Gradescope:
         Raises:
             NotLoggedInError: If not logged in.
         '''
-        if not self.logged_in: raise NotLoggedInError
+        if not self.logged_in:
+            raise NotLoggedInError
 
         gradebook = self.get_gradebook(course, member)
         url = None
@@ -275,7 +355,7 @@ class Gradescope:
                 url = item_data.get('submission').get('url')
                 break
 
-        if url == None:
+        if url is None:
             return None
 
         response = self.session.get(urljoin(BASE_URL, url + PAST_SUBMISSIONS))
@@ -311,7 +391,8 @@ class Gradescope:
         Raises:
             NotLoggedInError: If the user is not logged in.
         '''
-        if not self.logged_in: raise NotLoggedInError
+        if not self.logged_in:
+            raise NotLoggedInError
 
         url = GRADEBOOK.format(
             course_id=course.course_id,
@@ -334,7 +415,8 @@ class Gradescope:
         Raises:
             NotLoggedInError: If the user is not logged in.
         '''
-        if not self.logged_in: raise NotLoggedInError
+        if not self.logged_in:
+            raise NotLoggedInError
 
         response = self.session.get(assignment.get_grades_url())
         self._response_check(response)
@@ -351,7 +433,8 @@ class Gradescope:
         Raises:
             NotLoggedInError: If the user is not logged in.
         '''
-        if not self.logged_in: raise NotLoggedInError
+        if not self.logged_in:
+            raise NotLoggedInError
 
         response = self.session.get(url)
         self._response_check(response)

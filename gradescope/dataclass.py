@@ -62,6 +62,19 @@ class Assignment:
 
 
 @dataclass
+class StudentAssignment:
+    assignment_id: int
+    title: str
+    submission_url: str
+    template_url: str | None
+    submitted: bool
+    score: str | None
+    release_date: str
+    due_date: str
+    late_due_date: str | None
+
+
+@dataclass
 class Member:
     '''Represents a member (student or instructor) in Gradescope.'''
     member_id: int
