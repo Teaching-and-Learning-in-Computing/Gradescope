@@ -58,13 +58,15 @@ class Gradescope:
 
         Returns:
             bool: True if login is successful, False otherwise.
-        
+
         Raises:
             TypeError: If the username or password is None.
             LoginError: If the return URL after login is unknown.
         '''
-        if username is not None: self.username = username
-        if password is not None: self.password = password
+        if username is not None:
+            self.username = username
+        if password is not None:
+            self.password = password
         if self.username is None or self.password is None:
             raise TypeError('The username or password cannot be None.')
 
@@ -117,7 +119,8 @@ class Gradescope:
             NotLoggedInError: If not logged in.
             ResponseError: If the heading for the specified role is not found.
         '''
-        if not self.logged_in: raise NotLoggedInError
+        if not self.logged_in:
+            raise NotLoggedInError
 
         response = self.session.get(BASE_URL)
         self._response_check(response)
@@ -168,7 +171,8 @@ class Gradescope:
             NotLoggedInError: If not logged in.
             ResponseError: If the assignments table is empty or not found for the specified course.
         '''
-        if not self.logged_in: raise NotLoggedInError
+        if not self.logged_in:
+            raise NotLoggedInError
 
         response = self.session.get(course.get_url() + '/assignments')
         self._response_check(response)
@@ -215,7 +219,7 @@ class Gradescope:
         '''
         Retrieves the list of assignments visible to a student for the specified course.
 
-        This method parses the student-facing assignment table on Gradescope to extract information such as 
+        This method parses the student-facing assignment table on Gradescope to extract information such as
         assignment title, submission status, scores, due dates, and template download links.
 
         Args:
@@ -292,7 +296,8 @@ class Gradescope:
         Raises:
             NotLoggedInError: If not logged in.
         '''
-        if not self.logged_in: raise NotLoggedInError
+        if not self.logged_in:
+            raise NotLoggedInError
 
         response = self.session.get(course.get_url() + '/memberships')
         self._response_check(response)
@@ -339,7 +344,8 @@ class Gradescope:
         Raises:
             NotLoggedInError: If not logged in.
         '''
-        if not self.logged_in: raise NotLoggedInError
+        if not self.logged_in:
+            raise NotLoggedInError
 
         gradebook = self.get_gradebook(course, member)
         url = None
@@ -349,7 +355,7 @@ class Gradescope:
                 url = item_data.get('submission').get('url')
                 break
 
-        if url == None:
+        if url is None:
             return None
 
         response = self.session.get(urljoin(BASE_URL, url + PAST_SUBMISSIONS))
@@ -385,7 +391,8 @@ class Gradescope:
         Raises:
             NotLoggedInError: If the user is not logged in.
         '''
-        if not self.logged_in: raise NotLoggedInError
+        if not self.logged_in:
+            raise NotLoggedInError
 
         url = GRADEBOOK.format(
             course_id=course.course_id,
@@ -408,7 +415,8 @@ class Gradescope:
         Raises:
             NotLoggedInError: If the user is not logged in.
         '''
-        if not self.logged_in: raise NotLoggedInError
+        if not self.logged_in:
+            raise NotLoggedInError
 
         response = self.session.get(assignment.get_grades_url())
         self._response_check(response)
@@ -425,7 +433,8 @@ class Gradescope:
         Raises:
             NotLoggedInError: If the user is not logged in.
         '''
-        if not self.logged_in: raise NotLoggedInError
+        if not self.logged_in:
+            raise NotLoggedInError
 
         response = self.session.get(url)
         self._response_check(response)
