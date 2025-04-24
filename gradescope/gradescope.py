@@ -101,7 +101,7 @@ class Gradescope:
             log.warning('[Login] Login Failed.')
             self.logged_in = False
             return False
-        else:
+        else: 
             self.logged_in = False
             raise LoginError('Unknown return URL.')
 
