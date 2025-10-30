@@ -16,9 +16,9 @@ from .constants import BASE_URL, LOGIN_URL, GRADEBOOK, PAST_SUBMISSIONS, ROLE_MA
 
 
 class Gradescope:
-    """
+    '''
     A Python wrapper for Gradescope to easily retrieve data from your Gradescope Courses.
-    """
+    '''
 
     def __init__(
         self,
@@ -27,7 +27,7 @@ class Gradescope:
         auto_login: bool = True,
         verbose: bool = False,
     ) -> None:
-        """
+        '''
         Initializes a Gradescope object.
 
         Args:
@@ -35,7 +35,7 @@ class Gradescope:
             password (str | None): The password for logging into Gradescope. Defaults to None.
             auto_login (bool): Whether to automatically login upon object initialization. Defaults to True.
             verbose (bool): Whether to enable verbose logging. Defaults to False.
-        """
+        '''
         self.session = requests.session()
         self.username = username
         self.password = password
@@ -51,7 +51,7 @@ class Gradescope:
             self.login()
 
     def login(self, username: str | None = None, password: str | None = None) -> bool:
-        """
+        '''
         Log into Gradescope with the provided username and password.
 
         Args:
@@ -64,48 +64,48 @@ class Gradescope:
         Raises:
             TypeError: If the username or password is None.
             LoginError: If the return URL after login is unknown.
-        """
+        '''
         if username is not None:
             self.username = username
         if password is not None:
             self.password = password
         if self.username is None or self.password is None:
-            raise TypeError("The username or password cannot be None.")
+            raise TypeError('The username or password cannot be None.')
 
         response = self.session.get(BASE_URL)
         self._response_check(response)
-        soup = BeautifulSoup(response.text, "html.parser")
-        token_input = soup.find("input", attrs={"name": "authenticity_token"})
+        soup = BeautifulSoup(response.text, 'html.parser')
+        token_input = soup.find('input', attrs={'name': 'authenticity_token'})
 
         if token_input:
-            authenticity_token = token_input.get("value")
-            log.info(f"[Login] Authenticity Token: {authenticity_token}")
+            authenticity_token = token_input.get('value')
+            log.info(f'[Login] Authenticity Token: {authenticity_token}')
         else:
-            log.warning("[Login] Authenticity token not found.")
+            log.warning('[Login] Authenticity token not found.')
 
         data = {
-            "authenticity_token": authenticity_token,
-            "session[email]": self.username,
-            "session[password]": self.password,
-            "session[remember_me]": 0,
-            "commit": "Log In",
-            "session[remember_me_sso]": 0,
+            'authenticity_token': authenticity_token,
+            'session[email]': self.username,
+            'session[password]': self.password,
+            'session[remember_me]': 0,
+            'commit': 'Log In',
+            'session[remember_me_sso]': 0,
         }
         response = self.session.post(LOGIN_URL, data=data)
         self._response_check(response)
 
-        log.info(f"[Login] Current URL: {response.url}")
-        if "account" in response.url:
-            log.info("[Login] Login Successful.")
+        log.info(f'[Login] Current URL: {response.url}')
+        if 'account' in response.url:
+            log.info('[Login] Login Successful.')
             self.logged_in = True
             return True
-        elif "login" in response.url:
-            log.warning("[Login] Login Failed.")
+        elif 'login' in response.url:
+            log.warning('[Login] Login Failed.')
             self.logged_in = False
             return False
         else:
             self.logged_in = False
-            raise LoginError("Unknown return URL.")
+            raise LoginError('Unknown return URL.')
 
     @overload
     def get_courses(self, role: Role, *, as_dict: Literal[False] = False) -> list[Course]: ...
@@ -113,7 +113,7 @@ class Gradescope:
     def get_courses(self, role: Role, *, as_dict: Literal[True]) -> dict[int, Course]: ...
 
     def get_courses(self, role: Role, *, as_dict: bool = False) -> list[Course] | dict[int, Course]:
-        """
+        '''
         Retrieves the list of courses for the specified role.
 
         Args:
@@ -129,51 +129,51 @@ class Gradescope:
         Raises:
             NotLoggedInError: If not logged in.
             ResponseError: If the heading for the specified role is not found.
-        """
+        '''
         if not self.logged_in:
             raise NotLoggedInError
 
         response = self.session.get(BASE_URL)
         self._response_check(response)
-        soup = BeautifulSoup(response.text, "html.parser")
+        soup = BeautifulSoup(response.text, 'html.parser')
 
         courses_list: list[Course] = list()
         courses_dict: dict[int, Course] = dict()
         courses = courses_dict if as_dict else courses_list
 
-        current_heading = soup.find("h1", text="Course Dashboard")
+        current_heading = soup.find('h1', text='Course Dashboard')
 
         if current_heading:
             course_lists_header = current_heading.find_next_sibling(
-                "div", id="account-show"
+                'div', id='account-show'
             )
             if not course_lists_header:
-                log.warning("The course lists container was not found.")
+                log.warning('The course lists container was not found.')
                 return [] if not as_dict else {}
 
             course_lists = course_lists_header.find_all(
-                "div", class_="courseList"
+                'div', class_='courseList'
             )  # Handle users with multiple roles
 
             for course_list in course_lists:
-                for term in course_list.find_all(class_="courseList--term"):
+                for term in course_list.find_all(class_='courseList--term'):
                     term_name = term.get_text(strip=True)
                     courses_container = term.find_next_sibling(
-                        class_="courseList--coursesForTerm"
+                        class_='courseList--coursesForTerm'
                     )
                     if courses_container:
-                        for course in courses_container.find_all(class_="courseBox"):
-                            if course.name == "a":
-                                href = course.get("href", "")
+                        for course in courses_container.find_all(class_='courseBox'):
+                            if course.name == 'a':
+                                href = course.get('href', '')
                                 course_id = (
-                                    self._parse_int(href.split("/")[-1])
+                                    self._parse_int(href.split('/')[-1])
                                     if isinstance(href, str)
                                     else 0
                                 )
                                 short_name_elm = course.find(
-                                    class_="courseBox--shortname"
+                                    class_='courseBox--shortname'
                                 )
-                                full_name_elm = course.find(class_="courseBox--name")
+                                full_name_elm = course.find(class_='courseBox--name')
                                 course_obj = Course(
                                     course_id=course_id,
                                     url=str(href),
@@ -182,12 +182,12 @@ class Gradescope:
                                     short_name=(
                                         short_name_elm.get_text(strip=True)
                                         if short_name_elm
-                                        else ""
+                                        else ''
                                     ),
                                     full_name=(
                                         full_name_elm.get_text(strip=True)
                                         if full_name_elm
-                                        else ""
+                                        else ''
                                     ),
                                 )
 
@@ -197,12 +197,12 @@ class Gradescope:
                                     courses_list.append(course_obj)
 
         else:
-            log.warning(f"Cannot find heading for Role: {role}")
+            log.warning(f'Cannot find heading for Role: {role}')
             # raise ResponseError(f'Cannot find heading for Role: {role}')
         return courses
 
     def get_assignments(self, course: Course) -> list[Assignment]:
-        """
+        '''
         Retrieves the list of assignments for the specified course.
 
         Args:
@@ -214,67 +214,67 @@ class Gradescope:
         Raises:
             NotLoggedInError: If not logged in.
             ResponseError: If the assignments table is empty or not found for the specified course.
-        """
+        '''
         if not self.logged_in:
             raise NotLoggedInError
 
-        response = self.session.get(course.get_url() + "/assignments")
+        response = self.session.get(course.get_url() + '/assignments')
         self._response_check(response)
-        soup = BeautifulSoup(response.text, "html.parser")
-        assignments_data = soup.find("div", {"data-react-class": "AssignmentsTable"})
+        soup = BeautifulSoup(response.text, 'html.parser')
+        assignments_data = soup.find('div', {'data-react-class': 'AssignmentsTable'})
 
         assignments = list()
         if assignments_data:
-            assignments_data = json.loads(assignments_data.get("data-react-props"))
-            if "table_data" in assignments_data:
-                for data in assignments_data["table_data"]:
+            assignments_data = json.loads(assignments_data.get('data-react-props'))
+            if 'table_data' in assignments_data:
+                for data in assignments_data['table_data']:
                     assignments.append(
                         Assignment(
-                            assignment_id=self._parse_int(data.get("id")),
-                            assignment_type=data.get("type"),
-                            url=data.get("url"),
-                            title=data.get("title"),
-                            container_id=data.get("container_id"),
-                            versioned=data.get("is_versioned_assignment"),
-                            version_index=data.get("version_index"),
-                            version_name=data.get("version_name"),
-                            total_points=data.get("total_points"),
-                            student_submission=data.get("student_submission"),
-                            created_at=data.get("created_at"),
-                            release_date=data.get("submission_window", {}).get(
-                                "release_date"
+                            assignment_id=self._parse_int(data.get('id')),
+                            assignment_type=data.get('type'),
+                            url=data.get('url'),
+                            title=data.get('title'),
+                            container_id=data.get('container_id'),
+                            versioned=data.get('is_versioned_assignment'),
+                            version_index=data.get('version_index'),
+                            version_name=data.get('version_name'),
+                            total_points=data.get('total_points'),
+                            student_submission=data.get('student_submission'),
+                            created_at=data.get('created_at'),
+                            release_date=data.get('submission_window', {}).get(
+                                'release_date'
                             ),
-                            due_date=data.get("submission_window", {}).get("due_date"),
-                            hard_due_date=data.get("submission_window", {}).get(
-                                "hard_due_date"
+                            due_date=data.get('submission_window', {}).get('due_date'),
+                            hard_due_date=data.get('submission_window', {}).get(
+                                'hard_due_date'
                             ),
-                            time_limit=data.get("submission_window", {}).get(
-                                "time_limit"
+                            time_limit=data.get('submission_window', {}).get(
+                                'time_limit'
                             ),
-                            active_submissions=data.get("num_active_submissions"),
-                            grading_progress=data.get("grading_progress"),
-                            published=data.get("is_published"),
-                            regrade_requests_open=data.get("regrade_requests_open"),
+                            active_submissions=data.get('num_active_submissions'),
+                            grading_progress=data.get('grading_progress'),
+                            published=data.get('is_published'),
+                            regrade_requests_open=data.get('regrade_requests_open'),
                             regrade_requests_possible=data.get(
-                                "regrade_requests_possible"
+                                'regrade_requests_possible'
                             ),
                             regrade_request_count=data.get(
-                                "open_regrade_request_count"
+                                'open_regrade_request_count'
                             ),
-                            due_or_created_at_date=data.get("due_or_created_at_date"),
+                            due_or_created_at_date=data.get('due_or_created_at_date'),
                         )
                     )
                 return assignments
             else:
                 raise ResponseError(
-                    f"Assignments Table is empty for course ID: {course.course_id}"
+                    f'Assignments Table is empty for course ID: {course.course_id}'
                 )
         raise ResponseError(
-            f"Assignments Table not found for course ID: {course.course_id}"
+            f'Assignments Table not found for course ID: {course.course_id}'
         )
 
     def get_assignments_as_student(self, course: Course) -> list[StudentAssignment]:
-        """
+        '''
         Retrieves the list of assignments visible to a student for the specified course.
 
         This method parses the student-facing assignment table on Gradescope to extract information such as
@@ -289,70 +289,70 @@ class Gradescope:
         Raises:
             NotLoggedInError: If the user is not logged in.
             ResponseError: If the assignments table cannot be found for the specified course.
-        """
+        '''
         if not self.logged_in:
             raise NotLoggedInError
 
         response = self.session.get(course.get_url())
         self._response_check(response)
-        soup = BeautifulSoup(response.text, "html.parser")
+        soup = BeautifulSoup(response.text, 'html.parser')
 
-        assignments_table = soup.find("table", {"id": "assignments-student-table"})
+        assignments_table = soup.find('table', {'id': 'assignments-student-table'})
         if not assignments_table:
             raise ResponseError(
-                f"Student assignments table not found for course ID: {course.course_id}"
+                f'Student assignments table not found for course ID: {course.course_id}'
             )
 
         assignments = []
-        rows = assignments_table.find("tbody").find_all("tr")
+        rows = assignments_table.find('tbody').find_all('tr')
 
         for row in rows:
-            title_cell = row.find("th", class_="table--primaryLink")
+            title_cell = row.find('th', class_='table--primaryLink')
             if not title_cell:
                 continue
 
-            title_button = title_cell.find("button")
+            title_button = title_cell.find('button')
             title = (
                 title_button.get_text(strip=True)
                 if title_button
                 else title_cell.get_text(strip=True)
             )
             assignment_id = (
-                int(title_button["data-assignment-id"])
-                if title_button and "data-assignment-id" in title_button.attrs
+                int(title_button['data-assignment-id'])
+                if title_button and 'data-assignment-id' in title_button.attrs
                 else None
             )
             submission_url = (
-                title_button["data-post-url"]
-                if title_button and "data-post-url" in title_button.attrs
+                title_button['data-post-url']
+                if title_button and 'data-post-url' in title_button.attrs
                 else None
             )
             template_url = (
-                title_button.get("data-template-url")
-                if title_button and "data-template-url" in title_button.attrs
+                title_button.get('data-template-url')
+                if title_button and 'data-template-url' in title_button.attrs
                 else None
             )
 
-            status_cell = row.find("td", class_="submissionStatus")
+            status_cell = row.find('td', class_='submissionStatus')
             submitted = (
-                "submissionStatus-complete" in status_cell.get("class", [])
+                'submissionStatus-complete' in status_cell.get('class', [])
                 if status_cell
                 else False
             )
             score_div = (
-                status_cell.find("div", class_="submissionStatus--score")
+                status_cell.find('div', class_='submissionStatus--score')
                 if status_cell
                 else None
             )
             score = score_div.get_text(strip=True) if score_div else None
 
-            release_time = row.find("time", class_="submissionTimeChart--releaseDate")
-            due_time = row.find("time", class_="submissionTimeChart--dueDate")
+            release_time = row.find('time', class_='submissionTimeChart--releaseDate')
+            due_time = row.find('time', class_='submissionTimeChart--dueDate')
 
             # Some rows have two due time elements (for late due date)
-            all_due_times = row.find_all("time", class_="submissionTimeChart--dueDate")
+            all_due_times = row.find_all('time', class_='submissionTimeChart--dueDate')
             late_due_time = (
-                all_due_times[1]["datetime"] if len(all_due_times) > 1 else None
+                all_due_times[1]['datetime'] if len(all_due_times) > 1 else None
             )
 
             assignments.append(
@@ -363,8 +363,8 @@ class Gradescope:
                     template_url=template_url,
                     submitted=submitted,
                     score=score,
-                    release_date=release_time["datetime"] if release_time else None,
-                    due_date=due_time["datetime"] if due_time else None,
+                    release_date=release_time['datetime'] if release_time else None,
+                    due_date=due_time['datetime'] if due_time else None,
                     late_due_date=late_due_time,
                 )
             )
@@ -372,7 +372,7 @@ class Gradescope:
         return assignments
 
     def get_members(self, course: Course) -> list[Member]:
-        """
+        '''
         Retrieves the list of members for the specified course.
 
         Args:
@@ -383,34 +383,34 @@ class Gradescope:
 
         Raises:
             NotLoggedInError: If not logged in.
-        """
+        '''
         if not self.logged_in:
             raise NotLoggedInError
 
-        response = self.session.get(course.get_url() + "/memberships")
+        response = self.session.get(course.get_url() + '/memberships')
         self._response_check(response)
-        soup = BeautifulSoup(response.text, "html.parser")
+        soup = BeautifulSoup(response.text, 'html.parser')
 
         members = list()
-        for entry in soup.findAll("table")[0].findAll("tr"):
-            id_button = entry.find("button", class_="js-rosterName")
+        for entry in soup.findAll('table')[0].findAll('tr'):
+            id_button = entry.find('button', class_='js-rosterName')
             if id_button:
-                parsed_params = parse_qs(urlparse(id_button["data-url"]).query)
-                user_id = parsed_params.get("user_id")[0]
+                parsed_params = parse_qs(urlparse(id_button['data-url']).query)
+                user_id = parsed_params.get('user_id')[0]
 
-                other_info_button = entry.find("button", class_="rosterCell--editIcon")
-                data_cm = json.loads(other_info_button["data-cm"])
+                other_info_button = entry.find('button', class_='rosterCell--editIcon')
+                data_cm = json.loads(other_info_button['data-cm'])
 
-                role = other_info_button.get("data-role")
-                email = other_info_button.get("data-email")
+                role = other_info_button.get('data-role')
+                email = other_info_button.get('data-email')
 
                 member = Member(
                     member_id=user_id,
-                    full_name=data_cm.get("full_name"),
-                    first_name=data_cm.get("first_name"),
-                    last_name=data_cm.get("last_name"),
+                    full_name=data_cm.get('full_name'),
+                    first_name=data_cm.get('first_name'),
+                    last_name=data_cm.get('last_name'),
                     role=role,
-                    sid=data_cm.get("sid"),
+                    sid=data_cm.get('sid'),
                     email=email,
                 )
                 members.append(member)
@@ -420,7 +420,7 @@ class Gradescope:
     def get_past_submissions(
         self, course: Course, assignment: Assignment, member: Member
     ) -> list[Submission]:
-        """
+        '''
         Retrieves the list of past submissions for the specified course, assignment, and member.
 
         Args:
@@ -433,16 +433,16 @@ class Gradescope:
 
         Raises:
             NotLoggedInError: If not logged in.
-        """
+        '''
         if not self.logged_in:
             raise NotLoggedInError
 
         gradebook = self.get_gradebook(course, member)
         url = None
         for item in gradebook:
-            item_data = item.get("assignment")
-            if item_data.get("id") == assignment.assignment_id:
-                url = item_data.get("submission").get("url")
+            item_data = item.get('assignment')
+            if item_data.get('id') == assignment.assignment_id:
+                url = item_data.get('submission').get('url')
                 break
 
         if url is None:
@@ -450,7 +450,7 @@ class Gradescope:
 
         response = self.session.get(urljoin(BASE_URL, url + PAST_SUBMISSIONS))
         self._response_check(response)
-        json_data = json.loads(response.text)["past_submissions"]
+        json_data = json.loads(response.text)['past_submissions']
 
         submissions = list()
         for data in json_data:
@@ -459,16 +459,16 @@ class Gradescope:
                     course_id=course.course_id,
                     assignment_id=assignment.assignment_id,
                     member_id=member.member_id,
-                    submission_id=data.get("id"),
-                    created_at=data.get("created_at"),
-                    score=float(data.get("score")) if data.get("score") else None,
-                    url=data.get("show_path"),
+                    submission_id=data.get('id'),
+                    created_at=data.get('created_at'),
+                    score=float(data.get('score')) if data.get('score') else None,
+                    url=data.get('show_path'),
                 )
             )
         return submissions
 
     def get_gradebook(self, course: Course, member: Member) -> dict:
-        """
+        '''
         Retrieves the gradebook for a specific course and member.
 
         Args:
@@ -480,7 +480,7 @@ class Gradescope:
 
         Raises:
             NotLoggedInError: If the user is not logged in.
-        """
+        '''
         if not self.logged_in:
             raise NotLoggedInError
 
@@ -490,7 +490,7 @@ class Gradescope:
         return json.loads(response.text)
 
     def get_assignment_grades(self, assignment: Assignment) -> pd.DataFrame:
-        """
+        '''
         Retrieves the grades for a specific assignment.
 
         Args:
@@ -501,16 +501,16 @@ class Gradescope:
 
         Raises:
             NotLoggedInError: If the user is not logged in.
-        """
+        '''
         if not self.logged_in:
             raise NotLoggedInError
 
         response = self.session.get(assignment.get_grades_url())
         self._response_check(response)
-        return pd.read_csv(io.StringIO(response.content.decode("utf-8")), skiprows=2)
+        return pd.read_csv(io.StringIO(response.content.decode('utf-8')), skiprows=2)
 
     def download_file(self, path: str, url: str) -> None:
-        """
+        '''
         Downloads a file from a given URL and saves it to the specified path.
 
         Args:
@@ -519,17 +519,17 @@ class Gradescope:
 
         Raises:
             NotLoggedInError: If the user is not logged in.
-        """
+        '''
         if not self.logged_in:
             raise NotLoggedInError
 
         response = self.session.get(url)
         self._response_check(response)
-        with open(path, "wb") as file:
+        with open(path, 'wb') as file:
             file.write(response.content)
 
     def _response_check(self, response: requests.Response) -> bool:
-        """
+        '''
         Checks the response status code and raises an error if it's not 200.
 
         Args:
@@ -540,16 +540,16 @@ class Gradescope:
 
         Raises:
             ResponseError: If the status code is not 200.
-        """
+        '''
         if response.status_code == 200:
             return True
         else:
             raise ResponseError(
-                f"Failed to fetch the webpage. Status code: {response.status_code}. URL: {response.url}"
+                f'Failed to fetch the webpage. Status code: {response.status_code}. URL: {response.url}'
             )
 
     def _parse_int(self, text: str) -> int:
-        """
+        '''
         Parses an integer from a given text.
 
         Args:
@@ -557,11 +557,11 @@ class Gradescope:
 
         Returns:
             int: The parsed integer.
-        """
-        return int("".join(re.findall(r"\d", text)))
+        '''
+        return int(''.join(re.findall(r'\d', text)))
 
     def _to_datetime(self, text: str) -> datetime:
-        """
+        '''
         Converts a string to a datetime object.
 
         Args:
@@ -569,5 +569,5 @@ class Gradescope:
 
         Returns:
             datetime: The converted datetime object.
-        """
-        return datetime.strptime(text, "%Y-%m-%dT%H:%M")
+        '''
+        return datetime.strptime(text, '%Y-%m-%dT%H:%M')
