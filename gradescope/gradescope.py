@@ -9,6 +9,7 @@ import logging as log
 from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import urljoin, urlparse, parse_qs
+from typing import overload, Literal
 from .dataclass import Course, Assignment, StudentAssignment, Member, Submission
 from .errors import LoginError, NotLoggedInError, ResponseError
 from .constants import BASE_URL, LOGIN_URL, GRADEBOOK, PAST_SUBMISSIONS, ROLE_MAP, Role
@@ -18,12 +19,13 @@ class Gradescope:
     '''
     A Python wrapper for Gradescope to easily retrieve data from your Gradescope Courses.
     '''
+
     def __init__(
         self,
         username: str | None = None,
         password: str | None = None,
         auto_login: bool = True,
-        verbose: bool = False
+        verbose: bool = False,
     ) -> None:
         '''
         Initializes a Gradescope object.
@@ -101,19 +103,28 @@ class Gradescope:
             log.warning('[Login] Login Failed.')
             self.logged_in = False
             return False
-        else: 
+        else:
             self.logged_in = False
             raise LoginError('Unknown return URL.')
 
-    def get_courses(self, role: Role) -> list[Course]:
+    @overload
+    def get_courses(self, role: Role, *, as_dict: Literal[False] = False) -> list[Course]: ...
+    @overload
+    def get_courses(self, role: Role, *, as_dict: Literal[True]) -> dict[int, Course]: ...
+
+    def get_courses(self, role: Role, *, as_dict: bool = False) -> list[Course] | dict[int, Course]:
         '''
         Retrieves the list of courses for the specified role.
 
         Args:
             role (Role): The role for which to retrieve the courses.
+            as_dict (bool, optional): If True, return a dict keyed by course ID.
+                If False, return a list of Course objects. Defaults to False.
 
         Returns:
-            list[Course]: The list of courses for the specified role.
+            list[Course] | dict[int, Course]:
+                - list of Course objects if `as_dict` is False
+                - dict mapping course_id -> Course if `as_dict` is True
 
         Raises:
             NotLoggedInError: If not logged in.
@@ -126,32 +137,65 @@ class Gradescope:
         self._response_check(response)
         soup = BeautifulSoup(response.text, 'html.parser')
 
-        courses = list()
+        courses_list: list[Course] = list()
+        courses_dict: dict[int, Course] = dict()
+        courses = courses_dict if as_dict else courses_list
 
-        rmap = ROLE_MAP[role.value]
-        for _ in rmap:
-            current_heading = soup.find('h1', string=ROLE_MAP[role.value])
-            if current_heading:
-                break
+        current_heading = soup.find('h1', text='Course Dashboard')
 
         if current_heading:
-            course_lists = current_heading.find_next_sibling('div', class_='courseList')
-            for term in course_lists.find_all(class_='courseList--term'):
-                term_name = term.get_text(strip=True)
-                courses_container = term.find_next_sibling(class_='courseList--coursesForTerm')
-                if courses_container:
-                    for course in courses_container.find_all(class_='courseBox'):
-                        if course.name == 'a':
-                            courses.append(
-                                Course(
-                                    course_id=self._parse_int(course.get('href', '').split('/')[-1]),
-                                    url=course.get('href', None),
-                                    role=role.value,
-                                    term=term_name,
-                                    short_name=course.find(class_='courseBox--shortname').get_text(strip=True),
-                                    full_name=course.find(class_='courseBox--name').get_text(strip=True)
+            course_lists_header = current_heading.find_next_sibling(
+                'div', id='account-show'
+            )
+            if not course_lists_header:
+                log.warning('The course lists container was not found.')
+                return [] if not as_dict else {}
+
+            course_lists = course_lists_header.find_all(
+                'div', class_='courseList'
+            )  # Handle users with multiple roles
+
+            for course_list in course_lists:
+                for term in course_list.find_all(class_='courseList--term'):
+                    term_name = term.get_text(strip=True)
+                    courses_container = term.find_next_sibling(
+                        class_='courseList--coursesForTerm'
+                    )
+                    if courses_container:
+                        for course in courses_container.find_all(class_='courseBox'):
+                            if course.name == 'a':
+                                href = course.get('href', '')
+                                course_id = (
+                                    self._parse_int(href.split('/')[-1])
+                                    if isinstance(href, str)
+                                    else 0
                                 )
-                            )
+                                short_name_elm = course.find(
+                                    class_='courseBox--shortname'
+                                )
+                                full_name_elm = course.find(class_='courseBox--name')
+                                course_obj = Course(
+                                    course_id=course_id,
+                                    url=str(href),
+                                    role=Role(role.value),
+                                    term=term_name,
+                                    short_name=(
+                                        short_name_elm.get_text(strip=True)
+                                        if short_name_elm
+                                        else ''
+                                    ),
+                                    full_name=(
+                                        full_name_elm.get_text(strip=True)
+                                        if full_name_elm
+                                        else ''
+                                    ),
+                                )
+
+                                if as_dict:
+                                    courses_dict[course_id] = course_obj
+                                else:
+                                    courses_list.append(course_obj)
+
         else:
             log.warning(f'Cannot find heading for Role: {role}')
             # raise ResponseError(f'Cannot find heading for Role: {role}')
@@ -197,23 +241,37 @@ class Gradescope:
                             total_points=data.get('total_points'),
                             student_submission=data.get('student_submission'),
                             created_at=data.get('created_at'),
-                            release_date=data.get('submission_window', {}).get('release_date'),
+                            release_date=data.get('submission_window', {}).get(
+                                'release_date'
+                            ),
                             due_date=data.get('submission_window', {}).get('due_date'),
-                            hard_due_date=data.get('submission_window', {}).get('hard_due_date'),
-                            time_limit=data.get('submission_window', {}).get('time_limit'),
+                            hard_due_date=data.get('submission_window', {}).get(
+                                'hard_due_date'
+                            ),
+                            time_limit=data.get('submission_window', {}).get(
+                                'time_limit'
+                            ),
                             active_submissions=data.get('num_active_submissions'),
                             grading_progress=data.get('grading_progress'),
                             published=data.get('is_published'),
                             regrade_requests_open=data.get('regrade_requests_open'),
-                            regrade_requests_possible=data.get('regrade_requests_possible'),
-                            regrade_request_count=data.get('open_regrade_request_count'),
-                            due_or_created_at_date=data.get('due_or_created_at_date')
+                            regrade_requests_possible=data.get(
+                                'regrade_requests_possible'
+                            ),
+                            regrade_request_count=data.get(
+                                'open_regrade_request_count'
+                            ),
+                            due_or_created_at_date=data.get('due_or_created_at_date'),
                         )
                     )
                 return assignments
             else:
-                raise ResponseError(f'Assignments Table is empty for course ID: {course.course_id}')
-        raise ResponseError(f'Assignments Table not found for course ID: {course.course_id}')
+                raise ResponseError(
+                    f'Assignments Table is empty for course ID: {course.course_id}'
+                )
+        raise ResponseError(
+            f'Assignments Table not found for course ID: {course.course_id}'
+        )
 
     def get_assignments_as_student(self, course: Course) -> list[StudentAssignment]:
         '''
@@ -241,7 +299,9 @@ class Gradescope:
 
         assignments_table = soup.find('table', {'id': 'assignments-student-table'})
         if not assignments_table:
-            raise ResponseError(f'Student assignments table not found for course ID: {course.course_id}')
+            raise ResponseError(
+                f'Student assignments table not found for course ID: {course.course_id}'
+            )
 
         assignments = []
         rows = assignments_table.find('tbody').find_all('tr')
@@ -252,14 +312,38 @@ class Gradescope:
                 continue
 
             title_button = title_cell.find('button')
-            title = title_button.get_text(strip=True) if title_button else title_cell.get_text(strip=True)
-            assignment_id = int(title_button['data-assignment-id']) if title_button and 'data-assignment-id' in title_button.attrs else None
-            submission_url = title_button['data-post-url'] if title_button and 'data-post-url' in title_button.attrs else None
-            template_url = title_button.get('data-template-url') if title_button and 'data-template-url' in title_button.attrs else None
+            title = (
+                title_button.get_text(strip=True)
+                if title_button
+                else title_cell.get_text(strip=True)
+            )
+            assignment_id = (
+                int(title_button['data-assignment-id'])
+                if title_button and 'data-assignment-id' in title_button.attrs
+                else None
+            )
+            submission_url = (
+                title_button['data-post-url']
+                if title_button and 'data-post-url' in title_button.attrs
+                else None
+            )
+            template_url = (
+                title_button.get('data-template-url')
+                if title_button and 'data-template-url' in title_button.attrs
+                else None
+            )
 
             status_cell = row.find('td', class_='submissionStatus')
-            submitted = 'submissionStatus-complete' in status_cell.get('class', []) if status_cell else False
-            score_div = status_cell.find('div', class_='submissionStatus--score') if status_cell else None
+            submitted = (
+                'submissionStatus-complete' in status_cell.get('class', [])
+                if status_cell
+                else False
+            )
+            score_div = (
+                status_cell.find('div', class_='submissionStatus--score')
+                if status_cell
+                else None
+            )
             score = score_div.get_text(strip=True) if score_div else None
 
             release_time = row.find('time', class_='submissionTimeChart--releaseDate')
@@ -267,19 +351,23 @@ class Gradescope:
 
             # Some rows have two due time elements (for late due date)
             all_due_times = row.find_all('time', class_='submissionTimeChart--dueDate')
-            late_due_time = all_due_times[1]['datetime'] if len(all_due_times) > 1 else None
+            late_due_time = (
+                all_due_times[1]['datetime'] if len(all_due_times) > 1 else None
+            )
 
-            assignments.append(StudentAssignment(
-                assignment_id=assignment_id,
-                title=title,
-                submission_url=submission_url,
-                template_url=template_url,
-                submitted=submitted,
-                score=score,
-                release_date=release_time['datetime'] if release_time else None,
-                due_date=due_time['datetime'] if due_time else None,
-                late_due_date=late_due_time
-            ))
+            assignments.append(
+                StudentAssignment(
+                    assignment_id=assignment_id,
+                    title=title,
+                    submission_url=submission_url,
+                    template_url=template_url,
+                    submitted=submitted,
+                    score=score,
+                    release_date=release_time['datetime'] if release_time else None,
+                    due_date=due_time['datetime'] if due_time else None,
+                    late_due_date=late_due_time,
+                )
+            )
 
         return assignments
 
@@ -323,13 +411,15 @@ class Gradescope:
                     last_name=data_cm.get('last_name'),
                     role=role,
                     sid=data_cm.get('sid'),
-                    email=email
+                    email=email,
                 )
                 members.append(member)
         return members
 
     # Returns None when the member does not exist in the course or assignment
-    def get_past_submissions(self, course: Course, assignment: Assignment, member: Member) -> list[Submission]:
+    def get_past_submissions(
+        self, course: Course, assignment: Assignment, member: Member
+    ) -> list[Submission]:
         '''
         Retrieves the list of past submissions for the specified course, assignment, and member.
 
@@ -372,7 +462,7 @@ class Gradescope:
                     submission_id=data.get('id'),
                     created_at=data.get('created_at'),
                     score=float(data.get('score')) if data.get('score') else None,
-                    url=data.get('show_path')
+                    url=data.get('show_path'),
                 )
             )
         return submissions
@@ -394,10 +484,7 @@ class Gradescope:
         if not self.logged_in:
             raise NotLoggedInError
 
-        url = GRADEBOOK.format(
-            course_id=course.course_id,
-            member_id=member.member_id
-        )
+        url = GRADEBOOK.format(course_id=course.course_id, member_id=member.member_id)
         response = self.session.get(url)
         self._response_check(response)
         return json.loads(response.text)
@@ -457,7 +544,9 @@ class Gradescope:
         if response.status_code == 200:
             return True
         else:
-            raise ResponseError(f'Failed to fetch the webpage. Status code: {response.status_code}. URL: {response.url}')
+            raise ResponseError(
+                f'Failed to fetch the webpage. Status code: {response.status_code}. URL: {response.url}'
+            )
 
     def _parse_int(self, text: str) -> int:
         '''
@@ -481,4 +570,4 @@ class Gradescope:
         Returns:
             datetime: The converted datetime object.
         '''
-        return datetime.strptime(text, "%Y-%m-%dT%H:%M")
+        return datetime.strptime(text, '%Y-%m-%dT%H:%M')
