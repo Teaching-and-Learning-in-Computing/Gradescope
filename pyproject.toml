@@ -34,3 +34,4 @@ upload_to_pypi = true
 upload_to_release = true
 branch = "main"
 build_command = "python -m build"
+pypi_token = "PYPI_TOKEN"
