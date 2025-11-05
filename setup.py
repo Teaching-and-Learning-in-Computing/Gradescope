@@ -1,7 +1,7 @@
 import setuptools
 
 
-VERSION = '0.1.3'
+VERSION = '0.1.4'
 REQUIREMENTS = [i.strip() for i in open('requirements.txt').readlines()]
 
 with open('README.md', 'r', encoding='utf8') as f:
