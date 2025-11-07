@@ -102,7 +102,7 @@ class Gradescope:
         elif 'login' in response.url:
             log.warning('[Login] Login Failed.')
             self.logged_in = False
-            return False
+            raise LoginError()
         else:
             self.logged_in = False
             raise LoginError('Unknown return URL.')
@@ -144,23 +144,31 @@ class Gradescope:
         current_heading = soup.find('h1', text='Course Dashboard')
 
         if current_heading:
-            course_lists_header = current_heading.find_next_sibling(
-                'div', id='account-show'
-            )
+            course_lists_header = current_heading.find_next_sibling('div', id='account-show')
             if not course_lists_header:
                 log.warning('The course lists container was not found.')
                 return [] if not as_dict else {}
-
-            course_lists = course_lists_header.find_all(
-                'div', class_='courseList'
-            )  # Handle users with multiple roles
-
+            
+            course_lists = course_lists_header.find_all('div', class_='courseList') # Handle multiple course lists
+            pageHeadings = course_lists_header.find_all('h2', class_='pageHeading') # Handle multiple page headings
+            
+            # Determine what roles are available based on pageHeadings
+            available_roles = [h2.get_text(strip=True) for h2 in pageHeadings]
+            has_instructor = "Instructor Courses" in available_roles
+            has_student = "Student Courses" in available_roles
+            
+            # Filter course_lists based on role and available courses
+            if role == Role.INSTRUCTOR and not has_instructor or role == Role.STUDENT and not has_student:
+                return [] if not as_dict else {}
+            
+            course_lists = course_lists[:-1] if role == Role.INSTRUCTOR and has_student else course_lists
+            course_lists = course_lists[1:] if role == Role.STUDENT and has_instructor else course_lists
+            role = Role.INSTRUCTOR if role == Role.BOTH else role
+            
             for course_list in course_lists:
                 for term in course_list.find_all(class_='courseList--term'):
                     term_name = term.get_text(strip=True)
-                    courses_container = term.find_next_sibling(
-                        class_='courseList--coursesForTerm'
-                    )
+                    courses_container = term.find_next_sibling(class_='courseList--coursesForTerm')
                     if courses_container:
                         for course in courses_container.find_all(class_='courseBox'):
                             if course.name == 'a':
@@ -170,14 +178,12 @@ class Gradescope:
                                     if isinstance(href, str)
                                     else 0
                                 )
-                                short_name_elm = course.find(
-                                    class_='courseBox--shortname'
-                                )
+                                short_name_elm = course.find(class_='courseBox--shortname')
                                 full_name_elm = course.find(class_='courseBox--name')
                                 course_obj = Course(
                                     course_id=course_id,
                                     url=str(href),
-                                    role=Role(role.value),
+                                    role=role.value,
                                     term=term_name,
                                     short_name=(
                                         short_name_elm.get_text(strip=True)
@@ -195,10 +201,9 @@ class Gradescope:
                                     courses_dict[course_id] = course_obj
                                 else:
                                     courses_list.append(course_obj)
-
+                role=Role.STUDENT #switch role after going through instructor courses
         else:
-            log.warning(f'Cannot find heading for Role: {role}')
-            # raise ResponseError(f'Cannot find heading for Role: {role}')
+            raise ResponseError('Cannot find Course Dashbord')
         return courses
 
     def get_assignments(self, course: Course) -> list[Assignment]:
