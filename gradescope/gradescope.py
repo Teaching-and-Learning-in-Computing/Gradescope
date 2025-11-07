@@ -549,9 +549,7 @@ class Gradescope:
         if response.status_code == 200:
             return True
         else:
-            raise ResponseError(
-                f'Failed to fetch the webpage. Status code: {response.status_code}. URL: {response.url}'
-            )
+            raise response.raise_for_status()
 
     def _parse_int(self, text: str) -> int:
         '''

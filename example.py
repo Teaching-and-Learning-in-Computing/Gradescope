@@ -6,10 +6,10 @@ with open('./login.key', 'r') as f:
 
 gs = Gradescope(login_info['username'], login_info['password'], verbose=True)
 
-courses = gs.get_courses(role=Role.BOTH)
+courses = gs.get_courses(role=Role.STUDENT)
 save_json('./courses.data', courses, encoder=EnhancedJSONEncoder)
 
-course = courses[0]
+course = courses[1]
 print(courses)
 
 assignments = gs.get_assignments(course)
