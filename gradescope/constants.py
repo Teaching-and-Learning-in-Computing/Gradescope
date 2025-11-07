@@ -16,3 +16,4 @@ ROLE_MAP = {
 class Role(Enum):
     STUDENT = 'student'
     INSTRUCTOR = 'instructor'
+    BOTH = 'both'

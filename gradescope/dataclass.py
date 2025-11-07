@@ -10,7 +10,7 @@ class Course:
     '''Represents a course in Gradescope.'''
     course_id: int
     url: str
-    role: Role
+    role: str
     term: str
     short_name: str
     full_name: str

@@ -6,10 +6,10 @@ with open('./login.key', 'r') as f:
 
 gs = Gradescope(login_info['username'], login_info['password'], verbose=True)
 
-courses = gs.get_courses(role=Role.INSTRUCTOR)
+courses = gs.get_courses(role=Role.INSTRUCTOR) # Instructor, Student, or Both
 save_json('./courses.data', courses, encoder=EnhancedJSONEncoder)
 
-course = courses[0]
+course = courses[1]
 print(course)
 
 assignments = gs.get_assignments(course)
@@ -18,7 +18,7 @@ save_json('./assignments.data', assignments, encoder=EnhancedJSONEncoder)
 members = gs.get_members(course)
 save_json('./members.data', members, encoder=EnhancedJSONEncoder)
 
-assignment = assignments[5]
+assignment = assignments[0]
 print(assignment)
 
 member = members[2]
@@ -35,3 +35,7 @@ save_csv('./assignment_grades_csv.data', grades_csv)
 
 print('Downloading...', past_submission[-1])
 gs.download_file('./submission.zip', past_submission[-1].get_file_url())
+
+assignment.release_date="2025-10-13T14:50"
+assignment.title="TestHomework2"
+gs.update_assignment(assignment)
