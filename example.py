@@ -9,29 +9,32 @@ gs = Gradescope(login_info['username'], login_info['password'], verbose=True)
 courses = gs.get_courses(role=Role.INSTRUCTOR)
 save_json('./courses.data', courses, encoder=EnhancedJSONEncoder)
 
-course = courses[0]
-print(courses)
+course = courses[1]
+print(course)
 
 assignments = gs.get_assignments(course)
 save_json('./assignments.data', assignments, encoder=EnhancedJSONEncoder)
 
-members = gs.get_members(course)
-save_json('./members.data', members, encoder=EnhancedJSONEncoder)
+# members = gs.get_members(course)
+# save_json('./members.data', members, encoder=EnhancedJSONEncoder)
 
-assignment = assignments[5]
+assignment = assignments[0]
 print(assignment)
+assignment.release_date="2025-11-03T14:50"
 
-member = members[2]
-print(member)
+testing = gs.set_assignment_date(assignment)
 
-gradebook = gs.get_gradebook(course, member)
-save_json('./gradebook.data', gradebook, encoder=EnhancedJSONEncoder)
+# member = members[2]
+# print(member)
 
-past_submission = gs.get_past_submissions(course, assignment, member)
-save_json('./past_submission.data', past_submission, encoder=EnhancedJSONEncoder)
+# gradebook = gs.get_gradebook(course, member)
+# save_json('./gradebook.data', gradebook, encoder=EnhancedJSONEncoder)
 
-grades_csv = gs.get_assignment_grades(assignment)
-save_csv('./assignment_grades_csv.data', grades_csv)
+# past_submission = gs.get_past_submissions(course, assignment, member)
+# save_json('./past_submission.data', past_submission, encoder=EnhancedJSONEncoder)
 
-print('Downloading...', past_submission[-1])
-gs.download_file('./submission.zip', past_submission[-1].get_file_url())
+# grades_csv = gs.get_assignment_grades(assignment)
+# save_csv('./assignment_grades_csv.data', grades_csv)
+
+# print('Downloading...', past_submission[-1])
+# gs.download_file('./submission.zip', past_submission[-1].get_file_url())

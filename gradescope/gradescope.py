@@ -154,8 +154,8 @@ class Gradescope:
             
             # Determine what roles are available based on pageHeadings
             available_roles = [h2.get_text(strip=True) for h2 in pageHeadings]
-            has_instructor = "Instructor Courses" in available_roles
-            has_student = "Student Courses" in available_roles
+            has_instructor = any(role_name in available_roles for role_name in ROLE_MAP[Role.INSTRUCTOR.value])
+            has_student = any(role_name in available_roles for role_name in ROLE_MAP[Role.STUDENT.value])
             
             # Filter course_lists based on role and available courses
             if role == Role.INSTRUCTOR and not has_instructor or role == Role.STUDENT and not has_student:
@@ -574,3 +574,68 @@ class Gradescope:
             datetime: The converted datetime object.
         '''
         return datetime.strptime(text, '%Y-%m-%dT%H:%M')
+
+    def set_assignment_date(self, assignment: Assignment):
+        '''
+        Updates an assignment with stored values from the Assignment object,
+        preserving existing form values for fields not present in the Assignment object.
+
+        Args:
+            assignment (Assignment): The assignment to update
+
+        Raises:
+            NotLoggedInError: If not logged in
+        '''
+        if not self.logged_in:
+            raise NotLoggedInError
+
+        # First get the edit page to get the authenticity token and current form state
+        response = self.session.get(assignment.get_url() + "/edit")
+        self._response_check(response)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        form = soup.find('form', class_='form js-assignmentForm')
+        
+        # Helper function to get checked radio/checkbox value
+        def get_checked_value(name):
+            element = form.find('input', {'name': name, 'checked': True})
+            return element['value'] if element else None
+            
+        # Helper function to get input value
+        def get_input_value(name):
+            element = form.find('input', {'name': name})
+            return element['value'] if element else None
+        
+        # Construct the form data, using Assignment object values where available
+        data = {
+            'utf8': '✓',
+            '_method': 'patch',
+            'authenticity_token': get_input_value('authenticity_token'),
+            'assignment[type]': assignment.assignment_type or get_input_value('assignment[type]'),
+            'assignment[bubble_sheet]': get_input_value('assignment[bubble_sheet]'),
+            'assignment[title]': assignment.title,
+            'assignment[student_submission]': str(assignment.student_submission).lower() if hasattr(assignment, 'student_submission') else get_checked_value('assignment[student_submission]'),
+            'assignment[submissions_anonymized]': '0',
+            'assignment[release_date_string]': assignment.release_date,
+            'assignment[due_date_string]': assignment.due_date,
+            'assignment[allow_late_submissions]': '1' if assignment.hard_due_date else '0',
+            'assignment[enforce_time_limit]': '1' if assignment.time_limit else '0',
+            'assignment[time_limit_in_minutes]': str(assignment.time_limit) if assignment.time_limit else None,
+            'assignment[submission_type]': get_checked_value('assignment[submission_type]'),
+            'assignment[group_submission]': get_input_value('assignment[group_submission]'),
+            'assignment[template_visible_to_students]': get_input_value('assignment[template_visible_to_students]'),
+            'assignment[rubric_locking_setting]': get_checked_value('assignment[rubric_locking_setting]'),
+            'assignment[when_to_create_rubric]': get_checked_value('assignment[when_to_create_rubric]'),
+            'assignment[rubric_item_groups_mutually_exclusive]': get_input_value('assignment'),
+            'assignment[scoring_type]': get_checked_value('assignment[scoring_type]'),
+            'assignment[ceiling]': get_input_value('assignment[ceiling]'),
+            'assignment[floor]': get_input_value('assignment[floor]'),
+            'assignment[rubric_visibility_setting]': get_checked_value('assignment[rubric_visibility_setting]'),
+            'commit': 'Save'
+        }
+        
+        # Remove None values from the data dictionary
+        data = {k: v for k, v in data.items() if v is not None}
+
+        # Make the POST request
+        response = self.session.post(assignment.get_url(), data=data)
+        self._response_check(response)
