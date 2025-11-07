@@ -575,7 +575,7 @@ class Gradescope:
         '''
         return datetime.strptime(text, '%Y-%m-%dT%H:%M')
 
-    def set_assignment_date(self, assignment: Assignment):
+    def update_assignment(self, assignment: Assignment):
         '''
         Updates an assignment with stored values from the Assignment object,
         preserving existing form values for fields not present in the Assignment object.
@@ -591,6 +591,7 @@ class Gradescope:
 
         # First get the edit page to get the authenticity token and current form state
         response = self.session.get(assignment.get_url() + "/edit")
+        log.info(f'[Edit] Current URL: {response.url}')
         self._response_check(response)
         soup = BeautifulSoup(response.text, 'html.parser')
         form = soup.find('form', class_='form js-assignmentForm')
@@ -610,11 +611,11 @@ class Gradescope:
             'utf8': '✓',
             '_method': 'patch',
             'authenticity_token': get_input_value('authenticity_token'),
-            'assignment[type]': assignment.assignment_type or get_input_value('assignment[type]'),
+            'assignment[type]': get_input_value('assignment[type]'),
             'assignment[bubble_sheet]': get_input_value('assignment[bubble_sheet]'),
             'assignment[title]': assignment.title,
-            'assignment[student_submission]': str(assignment.student_submission).lower() if hasattr(assignment, 'student_submission') else get_checked_value('assignment[student_submission]'),
-            'assignment[submissions_anonymized]': '0',
+            'assignment[student_submission]': get_checked_value('assignment[student_submission]'),
+            'assignment[submissions_anonymized]': get_input_value('assignment[submissions_anonymized]'),
             'assignment[release_date_string]': assignment.release_date,
             'assignment[due_date_string]': assignment.due_date,
             'assignment[allow_late_submissions]': '1' if assignment.hard_due_date else '0',
@@ -625,7 +626,7 @@ class Gradescope:
             'assignment[template_visible_to_students]': get_input_value('assignment[template_visible_to_students]'),
             'assignment[rubric_locking_setting]': get_checked_value('assignment[rubric_locking_setting]'),
             'assignment[when_to_create_rubric]': get_checked_value('assignment[when_to_create_rubric]'),
-            'assignment[rubric_item_groups_mutually_exclusive]': get_input_value('assignment'),
+            'assignment[rubric_item_groups_mutually_exclusive]': get_checked_value('assignment[rubric_item_groups_mutually_exclusive]'),
             'assignment[scoring_type]': get_checked_value('assignment[scoring_type]'),
             'assignment[ceiling]': get_input_value('assignment[ceiling]'),
             'assignment[floor]': get_input_value('assignment[floor]'),
@@ -639,3 +640,4 @@ class Gradescope:
         # Make the POST request
         response = self.session.post(assignment.get_url(), data=data)
         self._response_check(response)
+        log.info(f'[Update Assignment] Current URL: {response.url}')

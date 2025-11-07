@@ -20,9 +20,10 @@ save_json('./assignments.data', assignments, encoder=EnhancedJSONEncoder)
 
 assignment = assignments[0]
 print(assignment)
-assignment.release_date="2025-11-03T14:50"
+assignment.release_date="2025-10-13T14:50"
+assignment.title="TestHomework2"
 
-testing = gs.set_assignment_date(assignment)
+testing = gs.update_assignment(assignment)
 
 # member = members[2]
 # print(member)
