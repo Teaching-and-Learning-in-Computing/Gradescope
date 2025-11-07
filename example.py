@@ -12,8 +12,8 @@ save_json('./courses.data', courses, encoder=EnhancedJSONEncoder)
 course = courses[0]
 print(courses)
 
-# assignments = gs.get_assignments(course)
-# save_json('./assignments.data', assignments, encoder=EnhancedJSONEncoder)
+assignments = gs.get_assignments(course)
+save_json('./assignments.data', assignments, encoder=EnhancedJSONEncoder)
 
 # members = gs.get_members(course)
 # save_json('./members.data', members, encoder=EnhancedJSONEncoder)
